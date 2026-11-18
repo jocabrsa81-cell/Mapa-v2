@@ -12,11 +12,18 @@
   #map { position: fixed; inset: 0; }
   #hud {
     position: fixed; left: 12px; bottom: calc(14px + env(safe-area-inset-bottom, 0px));
-    background: #14181c; color: #fff; border-radius: 14px; padding: 8px 14px 6px;
-    text-align: center; min-width: 74px; box-shadow: 0 2px 10px rgba(0,0,0,.35);
+    display: flex; align-items: stretch; gap: 0; background: #14181c; color: #fff;
+    border-radius: 14px; padding: 7px 0 6px; text-align: center; min-width: 158px;
+    box-shadow: 0 2px 10px rgba(0,0,0,.35); overflow: hidden;
   }
-  #spd { font-size: 40px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
-  #hud small { font-size: 12px; opacity: .75; }
+  .hud-item { min-width: 76px; padding: 0 10px; box-sizing: border-box; }
+  .hud-item + .hud-item { border-left: 1px solid rgba(255,255,255,.22); }
+  #spd, #limVal { font-size: 36px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
+  #hud small { font-size: 11px; opacity: .78; }
+  #limitHud.good #limVal { color: #4ade80; }
+  #limitHud.close #limVal { color: #facc15; }
+  #limitHud.over #limVal { color: #ff5252; }
+  #limitHud.unknown #limVal { color: #cbd5e1; }
   #chip {
     position: fixed; top: calc(10px + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%);
     background: #14181c; color: #fff; font-size: 14px; font-weight: 600; padding: 8px 14px;
@@ -169,7 +176,7 @@
 </head>
 <body>
 <div id="map"></div>
-<div id="hud"><div id="spd">0</div><small>km/h</small></div>
+<div id="hud"><div class="hud-item"><div id="spd">0</div><small>GPS km/h</small></div><div class="hud-item unknown" id="limitHud"><div id="limVal">—</div><small>Limite km/h</small></div></div>
 <div id="chip">A aguardar GPS…</div>
 <div id="info" hidden></div>
 <div id="wx" hidden></div>
@@ -211,6 +218,8 @@ const LIMIT = 50;  // km/h: abaixo disto os números aparecem
 const BACK = 55;   // km/h: só desaparecem acima disto (evita piscar)
 
 const spd = document.getElementById('spd');
+const limVal = document.getElementById('limVal');
+const limitHud = document.getElementById('limitHud');
 const chip = document.getElementById('chip');
 const rec = document.getElementById('rec');
 
@@ -661,6 +670,8 @@ function apply(p) {
   const v = (c.speed != null && !isNaN(c.speed)) ? c.speed * 3.6 : 0;
   spd.textContent = Math.round(v);
   curV = v;
+  atualizaCorLimite();
+  verificaLimiteEstrada([c.longitude, c.latitude]);
 
   numsOn = numsOn ? v < BACK : v < LIMIT;
   chip.className = numsOn ? 'on' : '';
@@ -1240,6 +1251,75 @@ function segDist(p, a, b) {
   t = Math.max(0, Math.min(1, t));
   return { d: Math.hypot(px - t * bx, py - t * by), t };
 }
+
+// ---- limite de velocidade da estrada atual (OpenStreetMap) ----
+// Só apresenta limites numéricos explícitos e associados à via mais próxima.
+// Não tenta adivinhar limites nacionais quando os dados não existem.
+let limiteEstrada = null, limiteConsultaT = 0, limiteConsultaPos = null, limiteConsultaBusy = false;
+let limiteCachePos = null, limiteCacheT = 0;
+try {
+  const lc = JSON.parse(localStorage.getItem('limiteEstradaCache') || 'null');
+  if (lc && Number.isFinite(lc.lim) && Array.isArray(lc.pos) && Date.now() - lc.t < 12 * 60 * 60 * 1000) {
+    limiteEstrada = lc.lim; limiteCachePos = lc.pos; limiteCacheT = lc.t;
+  }
+} catch (e) {}
+function atualizaCorLimite() {
+  if (!Number.isFinite(limiteEstrada)) {
+    limVal.textContent = '—'; limitHud.className = 'hud-item unknown'; return;
+  }
+  limVal.textContent = String(limiteEstrada);
+  const delta = curV - limiteEstrada;
+  limitHud.className = 'hud-item ' + (delta > 2 ? 'over' : delta >= -5 ? 'close' : 'good');
+}
+function maxspeedNumero(valor) {
+  if (valor == null) return null;
+  const m = String(valor).trim().match(/^(\d+(?:[.,]\d+)?)\s*(mph|km\/h)?$/i);
+  if (!m) return null;
+  const n = Number(m[1].replace(',', '.'));
+  if (!Number.isFinite(n) || n <= 0 || n > 200) return null;
+  return Math.round(m[2] && m[2].toLowerCase() === 'mph' ? n * 1.609344 : n);
+}
+async function verificaLimiteEstrada(pos) {
+  if (limiteConsultaBusy || Date.now() - limiteConsultaT < 45000) return;
+  if (limiteConsultaPos && geoDist(limiteConsultaPos, pos) < 35) return;
+  limiteConsultaBusy = true; limiteConsultaT = Date.now(); limiteConsultaPos = pos.slice();
+  const query = '[out:json][timeout:10];way(around:70,' + pos[1] + ',' + pos[0] + ')["highway"]["maxspeed"];out tags geom;';
+  const url = 'https://overpass-api.de/api/interpreter?data=' + encodeURIComponent(query);
+  try {
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), 12000);
+    let data;
+    try {
+      const res = await fetch(url, { signal: ctl.signal, cache: 'no-store' });
+      if (!res.ok) throw new Error('Overpass HTTP ' + res.status);
+      data = await res.json();
+    } finally { clearTimeout(timer); }
+    let best = null, bestDist = 26;
+    ((data && data.elements) || []).forEach(way => {
+      const lim = maxspeedNumero(way.tags && way.tags.maxspeed);
+      if (lim == null || !Array.isArray(way.geometry) || way.geometry.length < 2) return;
+      for (let i = 0; i < way.geometry.length - 1; i++) {
+        const a = [way.geometry[i].lon, way.geometry[i].lat];
+        const b = [way.geometry[i + 1].lon, way.geometry[i + 1].lat];
+        const d = segDist(pos, a, b).d;
+        if (d < bestDist) { bestDist = d; best = lim; }
+      }
+    });
+    // Não mantém um limite antigo se a nova estrada não tiver dados fiáveis.
+    limiteEstrada = best;
+    if (best != null) {
+      try { localStorage.setItem('limiteEstradaCache', JSON.stringify({ lim: best, pos: pos, t: Date.now() })); } catch (e) {}
+    }
+    atualizaCorLimite();
+  } catch (e) {
+    // Sem rede ou sem resposta: só conserva a cache se ainda for recente e próxima.
+    if (limiteCachePos && Date.now() - limiteCacheT < 12 * 60 * 60 * 1000 && geoDist(limiteCachePos, pos) < 150) {
+      // limiteEstrada já contém o valor guardado
+    } else { limiteEstrada = null; }
+    atualizaCorLimite();
+  } finally { limiteConsultaBusy = false; }
+}
+// ---- fim do limite de velocidade ----
 
 // a cada posição (no máximo 1 vez por segundo): progresso, fora de rota, chegada
 function routeTick(pos, acc) {
