@@ -1,0 +1,1828 @@
+<!doctype html>
+<html lang="pt">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f3f1ea">
+<title>Mapa de rua</title>
+<link rel="manifest" href="manifest.json">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css">
+<style>
+  html, body { margin: 0; height: 100%; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  #map { position: fixed; inset: 0; }
+  #hud {
+    position: fixed; left: 12px; bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+    background: #14181c; color: #fff; border-radius: 14px; padding: 8px 14px 6px;
+    text-align: center; min-width: 74px; box-shadow: 0 2px 10px rgba(0,0,0,.35);
+  }
+  #spd { font-size: 40px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
+  #hud small { font-size: 12px; opacity: .75; }
+  #chip {
+    position: fixed; top: calc(10px + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%);
+    background: #14181c; color: #fff; font-size: 14px; font-weight: 600; padding: 8px 14px;
+    border-radius: 999px; white-space: nowrap; max-width: 92vw; overflow: hidden; text-overflow: ellipsis;
+  }
+  #chip.on { background: #1a7f37; }
+  #info {
+    position: fixed; top: calc(56px + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%);
+    background: rgba(20,24,28,.82); color: #fff; font-size: 12px; padding: 4px 10px;
+    border-radius: 14px; max-width: 92vw; text-align: center;
+  }
+  #rec {
+    position: fixed; right: 12px; bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+    background: #1a73e8; color: #fff; border: 0; border-radius: 14px; padding: 14px 18px;
+    font-size: 16px; font-weight: 700; box-shadow: 0 2px 10px rgba(0,0,0,.35);
+  }
+  [hidden] { display: none !important; }
+  #sv {
+    position: fixed; right: 10px; top: calc(100px + env(safe-area-inset-top, 0px));
+    background: #14181c; color: #fff; border: 0; border-radius: 12px; padding: 10px 12px;
+    font-size: 14px; font-weight: 700;
+  }
+  #tr {
+    position: fixed; right: 10px; top: calc(150px + env(safe-area-inset-top, 0px));
+    background: #14181c; color: #fff; border: 0; border-radius: 12px; padding: 10px 12px;
+    font-size: 14px; font-weight: 700;
+  }
+  #tr.on { background: #1a7f37; }
+  #pn {
+    position: fixed; right: 10px; top: calc(200px + env(safe-area-inset-top, 0px));
+    background: #14181c; color: #fff; border-radius: 14px; padding: 12px; width: 220px;
+    font-size: 13px; box-shadow: 0 2px 10px rgba(0,0,0,.4);
+  }
+  #pn button { background: #1a73e8; color: #fff; border: 0; border-radius: 10px; padding: 10px; margin: 4px 4px 4px 0; font-size: 14px; font-weight: 700; }
+  #pt { margin-top: 6px; opacity: .9; }
+  .fdot { width: 18px; height: 18px; pointer-events: none; }
+  .fdot i {
+    display: block; width: 18px; height: 18px; border-radius: 50%; background: #d62828;
+    border: 3px solid #fff; box-sizing: border-box; box-shadow: 0 1px 4px rgba(0,0,0,.5);
+  }
+  .fdot b {
+    position: absolute; top: 21px; left: 50%; transform: translateX(-50%);
+    background: rgba(20,24,28,.85); color: #fff; font: 700 11px system-ui, sans-serif;
+    padding: 1px 5px; border-radius: 8px; white-space: nowrap;
+  }
+  #wx.ok { opacity: .8; font-weight: 600; }
+  #wx {
+    position: fixed; left: 10px; top: calc(100px + env(safe-area-inset-top, 0px));
+    background: #14181c; color: #fff; font-size: 14px; font-weight: 700;
+    padding: 9px 12px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,.35);
+  }
+  .me {
+    width: 30px; height: 30px; background: #1a73e8;
+    clip-path: polygon(50% 0, 100% 100%, 50% 74%, 0 100%);
+    filter: drop-shadow(0 1px 2px rgba(0,0,0,.5));
+  }
+  #go {
+    position: fixed; left: 10px; top: calc(150px + env(safe-area-inset-top, 0px));
+    background: #14181c; color: #fff; border: 0; border-radius: 12px; padding: 10px 12px;
+    font-size: 14px; font-weight: 700; box-shadow: 0 2px 10px rgba(0,0,0,.35);
+  }
+  #sp {
+    position: fixed; left: 0; right: 0; top: 0; z-index: 10; background: #14181c; color: #fff;
+    padding: calc(10px + env(safe-area-inset-top, 0px)) 12px 12px; box-shadow: 0 4px 14px rgba(0,0,0,.5);
+  }
+  #sp .lin { display: flex; gap: 8px; }
+  #sq { flex: 1; min-width: 0; font-size: 16px; padding: 11px 12px; border-radius: 10px; border: 0; background: #fff; color: #14181c; }
+  #sp button { background: #1a73e8; color: #fff; border: 0; border-radius: 10px; padding: 0 14px; font-size: 15px; font-weight: 700; }
+  #sp button.x { background: #3a4048; }
+  #sr { margin-top: 8px; max-height: 52vh; overflow-y: auto; }
+  #sr .it { padding: 10px 6px; border-top: 1px solid #2c3238; font-size: 15px; }
+  #sr .av { color: #ffb84d; font-size: 12px; margin-top: 2px; }
+  #sr .ok { color: #7bd88f; font-size: 12px; margin-top: 2px; }
+  #sr .msg { padding: 10px 6px; font-size: 14px; opacity: .85; }
+  #rb {
+    position: fixed; left: 12px; right: 12px; bottom: calc(94px + env(safe-area-inset-bottom, 0px)); z-index: 5;
+    background: #14181c; color: #fff; border-radius: 14px; padding: 10px 12px; box-shadow: 0 2px 10px rgba(0,0,0,.4);
+  }
+  #rbt { font-size: 17px; font-weight: 800; }
+  #rbn { font-size: 12px; opacity: .8; margin-top: 2px; }
+  #rbp { font-size: 13px; margin-top: 4px; color: #9cc3ff; }
+  #rb button { background: #1a73e8; color: #fff; border: 0; border-radius: 10px; padding: 9px 14px; margin: 8px 8px 0 0; font-size: 14px; font-weight: 700; }
+  #rb button.x { background: #b3261e; }
+  #nb {
+    position: fixed; left: 10px; top: calc(200px + env(safe-area-inset-top, 0px));
+    background: #14181c; color: #fff; border: 0; border-radius: 12px; padding: 10px 12px;
+    font-size: 14px; font-weight: 700; box-shadow: 0 2px 10px rgba(0,0,0,.35);
+  }
+  #nb.on { background: #1a7f37; }
+  #cx { position: fixed; left: 50%; top: 50%; width: 0; height: 0; z-index: 4; pointer-events: none; }
+  #cx::before, #cx::after { content: ''; position: absolute; background: #d62828; box-shadow: 0 0 0 2px #fff; }
+  #cx::before { left: -16px; top: -2px; width: 32px; height: 4px; }
+  #cx::after { left: -2px; top: -16px; width: 4px; height: 32px; }
+  #pk {
+    position: fixed; left: 12px; right: 12px; bottom: calc(94px + env(safe-area-inset-bottom, 0px)); z-index: 6;
+    background: #14181c; color: #fff; border-radius: 14px; padding: 10px 12px; box-shadow: 0 2px 10px rgba(0,0,0,.4);
+  }
+  #pk button { background: #1a7f37; color: #fff; border: 0; border-radius: 10px; padding: 10px 14px; margin: 8px 8px 0 0; font-size: 15px; font-weight: 700; }
+  #pk button.x { background: #3a4048; }
+  #tb {
+    position: fixed; left: 12px; right: 12px; top: calc(54px + env(safe-area-inset-top, 0px)); z-index: 5;
+    background: #0b57d0; color: #fff; border-radius: 14px; padding: 8px 14px; box-shadow: 0 2px 10px rgba(0,0,0,.4);
+    display: flex; align-items: center; gap: 14px;
+  }
+  #tfb {
+    position: fixed; right: 6px; width: 64px; z-index: 3; pointer-events: none;
+    top: calc(300px + env(safe-area-inset-top, 0px)); bottom: calc(240px + env(safe-area-inset-bottom, 0px));
+  }
+  #tfb .trk {
+    position: absolute; top: 28px; bottom: 54px; right: 25px; width: 14px; box-sizing: content-box;
+    background: #c9d0d7; border: 2px solid #fff; border-radius: 9px; overflow: hidden;
+    box-shadow: 0 0 0 1.5px rgba(20,24,28,.55), 0 2px 6px rgba(0,0,0,.35);
+  }
+  #tfb .trk i { position: absolute; left: 0; right: 0; min-height: 5px; display: block; }
+  #tfb .fl { position: absolute; top: 0; right: 18px; font-size: 22px; line-height: 1; filter: drop-shadow(0 1px 2px rgba(0,0,0,.6)); }
+  #tfb .ar {
+    position: absolute; bottom: 24px; right: 21px; width: 22px; height: 24px; background: #1a73e8;
+    clip-path: polygon(50% 0, 100% 100%, 50% 74%, 0 100%);
+  }
+  #tfb .lb {
+    position: absolute; bottom: 0; right: 4px; left: 0; text-align: center; font: 700 12px system-ui, sans-serif; color: #fff;
+    background: rgba(20,24,28,.88); border-radius: 9px; padding: 2px 4px; white-space: nowrap;
+  }
+  #tfb .ic {
+    position: absolute; right: 44px; width: 24px; height: 24px; border-radius: 50%; background: #fff; border: 2.5px solid #d62828;
+    font-size: 14px; line-height: 19px; text-align: center; box-shadow: 0 1px 4px rgba(0,0,0,.45);
+  }
+  #pn { z-index: 6; }
+  /* com uma rota ativa, os botões Guardar zona, Trânsito e Rumo desaparecem */
+  body.rota #sv, body.rota #tr, body.rota #nb, body.rota #pn { display: none !important; }
+  body.nav.rota #vz { top: calc(232px + env(safe-area-inset-top, 0px)); }
+  #tba { font-size: 38px; line-height: 1; }
+  #tbd { font-size: 26px; font-weight: 800; line-height: 1.1; }
+  #tbs { font-size: 14px; opacity: .92; }
+  #tbn { font-size: 13px; font-weight: 700; margin-top: 3px; }
+  #vz {
+    position: fixed; left: 10px; top: calc(250px + env(safe-area-inset-top, 0px));
+    background: #1a7f37; color: #fff; border: 0; border-radius: 12px; padding: 10px 12px;
+    font-size: 14px; font-weight: 700; box-shadow: 0 2px 10px rgba(0,0,0,.35);
+  }
+  #vz.off { background: #14181c; }
+  /* com a faixa de instruções no topo, os botões descem */
+  body.nav #wx, body.nav #sv { top: calc(132px + env(safe-area-inset-top, 0px)); }
+  body.nav #go, body.nav #tr { top: calc(182px + env(safe-area-inset-top, 0px)); }
+  body.nav #nb, body.nav #pn { top: calc(232px + env(safe-area-inset-top, 0px)); }
+  body.nav #vz { top: calc(282px + env(safe-area-inset-top, 0px)); }
+  body.nav #info { top: calc(124px + env(safe-area-inset-top, 0px)); }
+  .dst { font-size: 30px; line-height: 1; filter: drop-shadow(0 1px 2px rgba(0,0,0,.6)); }
+</style>
+</head>
+<body>
+<div id="map"></div>
+<div id="hud"><div id="spd">0</div><small>km/h</small></div>
+<div id="chip">A aguardar GPS…</div>
+<div id="info" hidden></div>
+<div id="wx" hidden></div>
+<button id="rec" hidden>Centrar</button>
+<button id="sv">Guardar zona</button>
+<button id="tr">Trânsito</button>
+<button id="go">Destino</button>
+<button id="nb">Rumo</button>
+<button id="vz">🔊 Voz</button>
+<div id="tfb" hidden><div class="trk" id="trk"></div><div class="fl">🏁</div><div class="ar"></div><div class="lb" id="tlb"></div></div>
+<div id="tb" hidden><div id="tba"></div><div><div id="tbd"></div><div id="tbs"></div><div id="tbn" hidden></div></div></div>
+<div id="cx" hidden></div>
+<div id="pk" hidden>
+  <div><b>Move o mapa até a cruz ficar no destino</b></div>
+  <div><button id="pkOk">Confirmar aqui</button><button class="x" id="pkNo">Cancelar</button></div>
+</div>
+<div id="sp" hidden>
+  <div class="lin"><input id="sq" type="search" placeholder="Rua, número, localidade" autocomplete="off" enterkeyhint="search"><button id="sb">Procurar</button><button class="x" id="sx">X</button></div>
+  <button id="sm" style="margin-top:8px;padding:10px 14px">Escolher no mapa</button>
+  <button id="lg" style="margin-top:8px;padding:10px 14px">Idioma</button>
+  <button id="zd" style="margin-top:8px;padding:10px 14px">Zonas de perigo (França): desligado</button>
+  <div id="sr"></div>
+</div>
+<div id="rb" hidden>
+  <div id="rbt"></div><div id="rbn" hidden></div><div id="rbp" hidden></div>
+  <div><button id="rbP">P perto do destino</button><button class="x" id="rbX">Parar</button></div>
+</div>
+<div id="pn" hidden>
+  Guarda o mapa à volta do centro do ecrã, para usar com sinal fraco. Usa wifi.
+  <div>
+    <button data-km="5">5 km</button><button data-km="10">10 km</button><button data-km="25">25 km</button>
+  </div>
+  <div id="pt"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<script>
+const LIMIT = 50;  // km/h: abaixo disto os números aparecem
+const BACK = 55;   // km/h: só desaparecem acima disto (evita piscar)
+
+const spd = document.getElementById('spd');
+const chip = document.getElementById('chip');
+const rec = document.getElementById('rec');
+
+let northUp = false;
+try { northUp = localStorage.getItem('nu') === '1'; } catch (e) {}
+let follow = true, numsOn = false, bearing = 0, last = null, ready = false;
+var busy = false, lastFail = 0, lastFetch = null, fuelOut = false;
+
+// trânsito em tempo real (TomTom): precisa de rede e não é guardado no telemóvel
+const KEY_TT = 'vKk6oa9UQ0WvDI9KYPST3Qq0VAdXguvI';
+const trBtn = document.getElementById('tr');
+let trOn = false, trErr = 0;
+try { trOn = localStorage.getItem('tr') === '1'; } catch (e) {}
+const trUrl = () => 'https://api.tomtom.com/traffic/map/4/tile/flow/relative/{z}/{x}/{y}.png?key=' + KEY_TT +
+  '&tileSize=256&t=' + Math.floor(Date.now() / 120000);
+
+// ---- idioma: PT (por defeito) ou FR ----
+// A lógica da app fica em português; em FR traduz-se só o que aparece no ecrã e o que é dito em voz.
+let LANG = 'pt'; try { LANG = localStorage.getItem('lg') === 'fr' ? 'fr' : 'pt'; } catch (e) {}
+const FR = LANG === 'fr';
+const LG_TT = FR ? 'fr-FR' : 'pt-PT';
+const FR_DICT = [
+  // frases de voz e de ecrã (mais específicas primeiro)
+  ['Sem voz portuguesa. Instala-a em Definições > Gestão geral > Texto para voz', 'Pas de voix française. Installez-la dans Paramètres > Gestion globale > Synthèse vocale'],
+  ['Sem rede: não dá para pesquisar moradas.', 'Pas de réseau : impossible de chercher des adresses.'],
+  ['Sem rede: não dá para calcular a rota', 'Pas de réseau : impossible de calculer l\'itinéraire'],
+  ['Guarda o mapa à volta do centro do ecrã, para usar com sinal fraco. Usa wifi.', 'Enregistre la carte autour du centre de l\'écran, pour l\'utiliser avec un signal faible. Utilise le wifi.'],
+  ['Move o mapa até a cruz ficar no destino', 'Déplacez la carte jusqu\'à ce que la croix soit sur la destination'],
+  ['Este telemóvel não suporta GPS no browser', 'Ce téléphone ne prend pas en charge le GPS dans le navigateur'],
+  ['Ativa a localização para este site', 'Activez la localisation pour ce site'],
+  ['⚠ número não encontrado: aponta para a rua', '⚠ numéro introuvable : pointe vers la rue'],
+  ['Sem números vizinhos nos dados.', 'Pas de numéros voisins dans les données.'],
+  ['A procurar números vizinhos…', 'Recherche des numéros voisins…'],
+  [/nº (\d+) \(vizinho do (.+?), que não existe nos dados\)/g, 'n° $1 (voisin du $2, qui n\'existe pas dans les données)'],
+  ['Zonas de perigo (França): ligado', 'Zones de danger (France) : activé'],
+  ['Zonas de perigo (França): desligado', 'Zones de danger (France) : désactivé'],
+  ['P perto do destino: a procurar…', 'P près de la destination : recherche…'],
+  ['P perto do destino: ', 'P près de la destination : '],
+  ['P perto do destino', 'P près de la destination'],
+  [' (em linha reta)', ' (à vol d\'oiseau)'],
+  ['Não consegui atualizar a rota (', 'Impossible de mettre à jour l\'itinéraire ('],
+  ['Rota falhou (', 'Échec de l\'itinéraire ('],
+  ['Falhou a pesquisa (', 'Échec de la recherche ('],
+  ['Rota calculada. ', 'Itinéraire calculé. '],
+  ['A recalcular a rota.', 'Recalcul de l\'itinéraire.'],
+  ['A calcular rota…', 'Calcul de l\'itinéraire…'],
+  ['Chegaste ao destino', 'Vous êtes arrivé'],
+  ['Voz ativada.', 'Voix activée.'],
+  ['Erro na app: ', 'Erreur de l\'app : '],
+  ['Não disponível neste browser.', 'Indisponible dans ce navigateur.'],
+  ['Zona demasiado grande (', 'Zone trop grande ('],
+  [' mosaicos falharam. Repete com boa rede.', ' tuiles ont échoué. Réessayez avec un bon réseau.'],
+  ['Guardado, mas ', 'Enregistré, mais '],
+  ['Zona guardada (', 'Zone enregistrée ('],
+  [' mosaicos)', ' tuiles)'],
+  ['A guardar ', 'Enregistrement '],
+  ['Trânsito: sem dados aqui', 'Trafic : pas de données ici'],
+  ['Trânsito: sem rede', 'Trafic : pas de réseau'],
+  ['Trânsito © TomTom', 'Trafic © TomTom'],
+  // avisos de tempo (voz)
+  ['Atenção, chuva gelada. Risco elevado de gelo na estrada.', 'Attention, pluie verglaçante. Risque élevé de verglas sur la route.'],
+  ['Atenção, gelo provável na estrada.', 'Attention, verglas probable sur la route.'],
+  ['Atenção, possível gelo na estrada.', 'Attention, verglas possible sur la route.'],
+  ['Atenção, risco de gelo na estrada.', 'Attention, risque de verglas sur la route.'],
+  ['Atenção, neve. Conduza com cuidado.', 'Attention, neige. Conduisez prudemment.'],
+  ['Atenção, nevoeiro. Reduza a velocidade.', 'Attention, brouillard. Réduisez votre vitesse.'],
+  ['Atenção, chuva forte. Reduza a velocidade.', 'Attention, forte pluie. Réduisez votre vitesse.'],
+  [' Temperatura de ', ' Température de '],
+  // radares e zonas de perigo
+  ['Atenção, zona de perigo nos próximos ', 'Attention, zone de danger sur les prochains '],
+  ['Atenção, aproxima-se de um radar.', 'Attention, un radar approche.'],
+  [' Limite de velocidade, ', ' Limite de vitesse, '],
+  ['quilómetros por hora', 'kilomètres par heure'],
+  ['Zona de perigo', 'Zone de danger'],
+  ['Radar · limite', 'Radar · limite'],
+  // perigos na estrada (voz e popups)
+  ['condições perigosas na estrada', 'conditions dangereuses sur la route'],
+  ['Condições perigosas', 'Conditions dangereuses'],
+  ['gelo na estrada', 'verglas sur la route'],
+  ['faixa cortada', 'voie fermée'], ['Faixa cortada', 'Voie fermée'],
+  ['estrada cortada', 'route coupée'], ['Estrada cortada', 'Route coupée'],
+  ['trânsito lento', 'trafic ralenti'],
+  ['veículo avariado', 'véhicule en panne'], ['Veículo avariado', 'Véhicule en panne'],
+  ['vento forte', 'vent fort'], ['Vento forte', 'Vent fort'],
+  ['inundação', 'inondation'], ['Inundação', 'Inondation'],
+  [/\bacidente\b/g, 'accident'], [/\bAcidente\b/g, 'Accident'],
+  [' logo à frente.', ' juste devant.'],
+  [' à frente: ', ' devant : '],
+  ['Atenção, ', 'Attention, '],
+  ['Chuva forte', 'Forte pluie'],
+  [/(^|\s)até /g, '$1jusqu\'à '],
+  // tempo no ecrã
+  ['Chuva gelada', 'Pluie verglaçante'], ['Gelo provável', 'Verglas probable'], ['Possível gelo', 'Verglas possible'],
+  ['Risco de gelo', 'Risque de verglas'], ['Nevoeiro', 'Brouillard'], ['nevoeiro', 'brouillard'], [/\bNeve\b/g, 'Neige'], [/\bChuva\b/g, 'Pluie'],
+  ['(guardado)', '(enregistré)'],
+  [/\bIncidente\b/g, 'Incident'], [/\bObras\b/g, 'Travaux'], [/\bGelo\b/g, 'Verglas'],
+  // instruções de navegação (voz)
+  ['vire acentuadamente à esquerda', 'tournez franchement à gauche'], ['vire acentuadamente à direita', 'tournez franchement à droite'],
+  ['vire à esquerda', 'tournez à gauche'], ['vire à direita', 'tournez à droite'],
+  ['siga ligeiramente à esquerda', 'serrez légèrement à gauche'], ['siga ligeiramente à direita', 'serrez légèrement à droite'],
+  ['mantenha-se à esquerda', 'restez à gauche'], ['mantenha-se à direita', 'restez à droite'],
+  ['faça inversão de marcha', 'faites demi-tour'],
+  ['entre na autoestrada', 'entrez sur l\'autoroute'], ['entre na rampa', 'prenez la bretelle'],
+  ['na rotunda, saia na saída número ', 'au rond-point, prenez la sortie numéro '],
+  ['na rotunda, saia na ', 'au rond-point, prenez la '],
+  ['na rotunda, siga em frente', 'au rond-point, continuez tout droit'],
+  ['na rotunda, saia à esquerda', 'au rond-point, sortez à gauche'], ['na rotunda, saia à direita', 'au rond-point, sortez à droite'],
+  ['na rotunda, volte para trás', 'au rond-point, faites demi-tour'],
+  [' saída', ' sortie'],
+  ['saia à esquerda', 'sortez à gauche'], ['saia à direita', 'sortez à droite'],
+  [', saída número ', ', sortie numéro '], [' número ', ' numéro '],
+  [/\bsaia\b/g, 'sortez'],
+  ['mude para a estrada principal', 'passez sur la route principale'], ['mude para a estrada paralela', 'passez sur la route parallèle'],
+  ['apanhe o ferry', 'prenez le ferry'],
+  ['chegou ao destino, fica à esquerda', 'vous êtes arrivé, la destination est à gauche'],
+  ['chegou ao destino, fica à direita', 'vous êtes arrivé, la destination est à droite'],
+  ['chegou ao destino', 'vous êtes arrivé à destination'],
+  ['siga as indicações', 'suivez les indications'],
+  [', e logo a seguir, ', ', puis tout de suite, '], [', e depois, dentro de ', ', puis, dans '],
+  ['Dentro de ', 'Dans '],
+  ['Depois: ', 'Ensuite : '],
+  [/(\d+)ª sortie/g, '$1e sortie'], ['saída ', 'sortie '],
+  [/prenez la (primeira|segunda|terceira|quarta|quinta|sexta|sétima|oitava|nona)/g, (m, o) => 'prenez la ' + ({ primeira: 'première', segunda: 'deuxième', terceira: 'troisième', quarta: 'quatrième', quinta: 'cinquième', sexta: 'sixième', sétima: 'septième', oitava: 'huitième', nona: 'neuvième' })[o]],
+  // unidades faladas
+  [/\bquilómetros\b/g, 'kilomètres'], [/\bquilómetro\b/g, 'kilomètre'], [/\bmetros\b/g, 'mètres'],
+  [/\bminutos\b/g, 'minutes'], [/\bminuto\b/g, 'minute'], [/\bhoras\b/g, 'heures'], [/\bhora\b/g, 'heure'],
+  [/\bgraus\b/g, 'degrés'], [/\bgrau\b/g, 'degré'], [/\bmenos /g, 'moins '],
+  [/ a (?=\d)/g, ' à '], [/ e (?=\d)/g, ' et '],
+  // botões e mensagens do ecrã
+  ['A aguardar GPS…', 'En attente du GPS…'], ['A localizar…', 'Localisation…'], ['Sem sinal de GPS', 'Pas de signal GPS'],
+  ['Guardar zona', 'Enregistrer la zone'], [/\bTrânsito\b/g, 'Trafic'], [/^Centrar$/, 'Centrer'],
+  [/^Destino$/, 'Destination'], [/^Rumo$/, 'Cap'], [/^Norte$/, 'Nord'], [/Mudo$/, 'Muet'], [/Voz$/, 'Voix'],
+  ['Confirmar aqui', 'Confirmer ici'], [/^Cancelar$/, 'Annuler'], [/^Procurar$/, 'Chercher'],
+  ['Escolher no mapa', 'Choisir sur la carte'], [/^Parar$/, 'Arrêter'], ['A procurar…', 'Recherche…'],
+  ['Nada encontrado.', 'Rien trouvé.'], ['tempo esgotado', 'délai dépassé'], ['ponto exato', 'point exact'], ['rua / zona', 'rue / zone'],
+  ['Ponto escolhido no mapa', 'Point choisi sur la carte'],
+  [' por trânsito', ' à cause du trafic'],
+  ['Bomba de combustível', 'Station-service'], ['Estacionamento', 'Parking'], ['Carregador elétrico', 'Borne de recharge'], ['WC público', 'WC publics'],
+  ['Mapa de rua', 'Carte'],
+  ['nº ', 'n° ']
+];
+function frTr(s) {
+  if (!s || !FR) return s;
+  let o = s;
+  for (const [a, b] of FR_DICT) o = (typeof a === 'string') ? o.split(a).join(b) : o.replace(a, b);
+  return o;
+}
+const frNos = new WeakMap();
+function frNo(n) {
+  if (n.nodeType === 3) {
+    const m = frNos.get(n);
+    if (m && m === n.data) return;
+    const o = frTr(n.data);
+    if (o !== n.data) { n.data = o; frNos.set(n, o); }
+  } else if (n.nodeType === 1 && !/^(SCRIPT|STYLE|CANVAS)$/.test(n.tagName)) {
+    n.childNodes.forEach(frNo);
+  }
+}
+if (FR) {
+  document.documentElement.lang = 'fr';
+  document.title = frTr(document.title);
+  const sq0 = document.getElementById('sq'); if (sq0) sq0.placeholder = 'Rue, numéro, localité';
+  frNo(document.body);
+  new MutationObserver(ms => ms.forEach(m => {
+    if (m.type === 'characterData') frNo(m.target); else m.addedNodes.forEach(frNo);
+  })).observe(document.body, { childList: true, characterData: true, subtree: true });
+}
+const lgBtn = document.getElementById('lg');
+lgBtn.textContent = FR ? 'Langue : Français → Português' : 'Idioma: Português → Français';
+lgBtn.addEventListener('click', () => { try { localStorage.setItem('lg', FR ? 'pt' : 'fr'); } catch (e) {} location.reload(); });
+// ---- fim do idioma ----
+
+const map = new maplibregl.Map({
+  container: 'map',
+  style: 'https://tiles.openfreemap.org/styles/liberty',
+  center: [6.08, 49.48], zoom: 15,
+  attributionControl: { compact: true }
+});
+map.touchZoomRotate.disableRotation();
+map.dragRotate.disable();
+
+const dot = document.createElement('div');
+dot.className = 'me';
+const me = new maplibregl.Marker({ element: dot, rotationAlignment: 'viewport', pitchAlignment: 'viewport' });
+
+map.on('load', () => {
+  // esconde os números de porta do estilo base; uso uma camada própria
+  map.getStyle().layers
+    .filter(l => l['source-layer'] === 'housenumber')
+    .forEach(l => map.setLayoutProperty(l.id, 'visibility', 'none'));
+
+  map.addLayer({
+    id: 'nums', type: 'symbol', source: 'openmaptiles', 'source-layer': 'housenumber', minzoom: 16,
+    layout: {
+      'text-field': ['get', 'housenumber'],
+      'text-font': ['Noto Sans Bold'],
+      'text-size': ['interpolate', ['linear'], ['zoom'], 16, 12, 19, 18],
+      'text-allow-overlap': false,
+      visibility: 'none'
+    },
+    paint: { 'text-color': '#7a1f00', 'text-halo-color': '#fff', 'text-halo-width': 2 }
+  });
+
+  // carregador elétrico = classe ou subclasse "charging_station"
+  const isEV = ['any',
+    ['==', ['get', 'class'], 'charging_station'],
+    ['==', ['get', 'subclass'], 'charging_station']];
+  // bombas de combustível vêm do Overpass (edifício a vermelho); dos tiles só parking e carregadores
+  // WC públicos
+  const isWC = ['any',
+    ['==', ['get', 'class'], 'toilets'],
+    ['==', ['get', 'subclass'], 'toilets']];
+  const poiFilter = ['all', ['!', isEV], ['any', ['==', ['get', 'class'], 'parking'], isWC]];
+  // ao afastar o zoom (12 a 15) mantém-se um ponto laranja simples para as bombas
+  map.addLayer({
+    id: 'poi-fuel-far', type: 'circle', source: 'openmaptiles', 'source-layer': 'poi', minzoom: 12,
+    filter: ['all', ['==', ['get', 'class'], 'fuel'], ['!', isEV]],
+    paint: {
+      'circle-radius': ['interpolate', ['linear'], ['zoom'], 12, 4, 18, 10],
+      'circle-color': '#d62828', 'circle-stroke-width': 1.5, 'circle-stroke-color': '#fff'
+    }
+  });
+  map.addLayer({
+    id: 'poi-pontos', type: 'circle', source: 'openmaptiles', 'source-layer': 'poi', minzoom: 13,
+    filter: poiFilter,
+    paint: {
+      'circle-radius': ['interpolate', ['linear'], ['zoom'], 13, 5, 18, 11],
+      'circle-color': ['case', isEV, '#1a9850', isWC, '#f08c00', ['==', ['get', 'class'], 'fuel'], '#d62828', '#1c6dd0'],
+      'circle-stroke-width': 2, 'circle-stroke-color': '#fff'
+    }
+  });
+  map.addLayer({
+    id: 'poi-letra', type: 'symbol', source: 'openmaptiles', 'source-layer': 'poi', minzoom: 15,
+    filter: poiFilter,
+    layout: {
+      'text-field': ['case', isEV, 'E', isWC, 'WC', ['==', ['get', 'class'], 'fuel'], 'G', 'P'],
+      'text-font': ['Noto Sans Bold'], 'text-size': ['case', isWC, 10, 12], 'text-allow-overlap': true
+    },
+    paint: { 'text-color': '#fff' }
+  });
+
+  // estacionamento de livraison (carga/descarga): P verde, dados de livraison.json (overpass-turbo)
+  map.addSource('liv', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+  map.addLayer({
+    id: 'liv-pontos', type: 'circle', source: 'liv', minzoom: 13,
+    paint: {
+      'circle-radius': ['interpolate', ['linear'], ['zoom'], 13, 5, 18, 11],
+      'circle-color': '#1a9850', 'circle-stroke-width': 2, 'circle-stroke-color': '#fff'
+    }
+  });
+  map.addLayer({
+    id: 'liv-letra', type: 'symbol', source: 'liv', minzoom: 15,
+    layout: { 'text-field': 'P', 'text-font': ['Noto Sans Bold'], 'text-size': 12, 'text-allow-overlap': true },
+    paint: { 'text-color': '#fff' }
+  });
+
+  // bombas de combustível: área inteira a vermelho com G branco; ponto vermelho se só houver um ponto
+  map.addSource('fuel', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+  map.addLayer({
+    id: 'fuel-area', type: 'fill', source: 'fuel', minzoom: 15,
+    filter: ['==', ['geometry-type'], 'Polygon'],
+    paint: { 'fill-color': '#d62828', 'fill-opacity': 0.88 }
+  }, 'poi-pontos');
+  map.addLayer({
+    id: 'fuel-borda', type: 'line', source: 'fuel', minzoom: 15,
+    filter: ['==', ['geometry-type'], 'Polygon'],
+    paint: { 'line-color': '#8d0801', 'line-width': 2 }
+  }, 'poi-pontos');
+  map.addLayer({
+    id: 'fuel-ponto', type: 'circle', source: 'fuel', minzoom: 15,
+    filter: ['==', ['geometry-type'], 'Point'],
+    paint: {
+      'circle-radius': ['interpolate', ['linear'], ['zoom'], 15, 6, 18, 12],
+      'circle-color': '#d62828', 'circle-stroke-width': 2, 'circle-stroke-color': '#fff'
+    }
+  });
+  map.addLayer({
+    id: 'fuel-g', type: 'symbol', source: 'fuel', minzoom: 15,
+    layout: { 'text-field': 'G', 'text-font': ['Noto Sans Bold'], 'text-size': ['interpolate', ['linear'], ['zoom'], 15, 13, 18, 20], 'text-allow-overlap': true },
+    paint: { 'text-color': '#fff' }
+  });
+
+  // trânsito: estradas coloridas por baixo dos nomes das ruas
+  map.addSource('trafego', { type: 'raster', tiles: [trUrl()], tileSize: 256, maxzoom: 18, attribution: 'Trânsito © TomTom' });
+  const etiqueta = map.getStyle().layers.find(l => l.type === 'symbol');
+  map.addLayer({
+    id: 'trafego', type: 'raster', source: 'trafego',
+    layout: { visibility: 'none' }, paint: { 'raster-opacity': 0.85 }
+  }, etiqueta ? etiqueta.id : undefined);
+
+  // incidentes (acidentes, obras, estradas cortadas): só com o botão Trânsito ligado
+  criaIconesInc();
+  map.addSource('inc', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+  map.addLayer({
+    id: 'inc-lin', type: 'line', source: 'inc', minzoom: 9,
+    filter: ['==', ['geometry-type'], 'LineString'], layout: { visibility: 'none' },
+    paint: {
+      'line-color': ['match', ['get', 'cat'], 8, '#d62828', 1, '#d62828', 7, '#f08c00', 9, '#f08c00', '#e0a800'],
+      'line-width': ['interpolate', ['linear'], ['zoom'], 9, 2, 16, 6], 'line-opacity': 0.9
+    }
+  }, etiqueta ? etiqueta.id : undefined);
+  map.addLayer({
+    id: 'inc-icon', type: 'symbol', source: 'inc', minzoom: 9,
+    filter: ['==', ['geometry-type'], 'Point'],
+    layout: {
+      visibility: 'none', 'icon-image': ['get', 'img'],
+      // sem empilhar: onde dois símbolos se sobrepõem, fica o mais grave (acidente, estrada cortada, faixa, obras)
+      'icon-allow-overlap': false, 'icon-padding': 3,
+      'symbol-sort-key': ['match', ['get', 'cat'], 1, 0, 8, 1, 7, 2, 9, 3, 4],
+      'icon-size': ['interpolate', ['linear'], ['zoom'], 9, 0.6, 16, 1]
+    }
+  });
+
+  // números de porta por cima das áreas das bombas (mas abaixo dos pontos P, E, WC)
+  map.moveLayer('nums', 'poi-pontos');
+
+  // rota (por baixo dos números de porta e dos pontos) e ligações aos parques perto do destino
+  map.addSource('rota', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+  map.addLayer({ id: 'rota-borda', type: 'line', source: 'rota', layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: { 'line-color': '#fff', 'line-width': ['interpolate', ['linear'], ['zoom'], 8, 6, 17, 14], 'line-opacity': 0.95 } }, 'nums');
+  map.addLayer({ id: 'rota-lin', type: 'line', source: 'rota', layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: { 'line-color': '#0b57d0', 'line-width': ['interpolate', ['linear'], ['zoom'], 8, 3, 17, 8] } }, 'nums');
+  map.addSource('pperto', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+  map.addLayer({ id: 'pp-lin', type: 'line', source: 'pperto', filter: ['==', ['geometry-type'], 'LineString'],
+    paint: { 'line-color': '#1c6dd0', 'line-width': 3, 'line-dasharray': [2, 2] } });
+  map.addLayer({ id: 'pp-txt', type: 'symbol', source: 'pperto', filter: ['==', ['geometry-type'], 'Point'],
+    layout: { 'text-field': ['get', 'txt'], 'text-font': ['Noto Sans Bold'], 'text-size': 13, 'text-offset': [0, -1.6], 'text-allow-overlap': true },
+    paint: { 'text-color': '#0b3d91', 'text-halo-color': '#fff', 'text-halo-width': 2 } });
+
+  ready = true;
+  if (last) apply(last);
+  loadPark();
+  setTrafego(trOn);
+});
+
+const info = document.getElementById('info');
+
+// protege contra erros: nunca deixa a etiqueta presa em "a carregar…"
+async function loadPark() {
+  const wasBusy = busy;
+  try { await loadParkInner(); }
+  catch (err) {
+    lastFail = Date.now();
+    info.hidden = false;
+    info.textContent = 'Erro na app: ' + (err && err.message ? err.message : err);
+  } finally { if (!wasBusy) busy = false; }
+}
+
+// toque num ponto ou linha: mostra o tipo e o nome
+const popup = new maplibregl.Popup({ closeButton: false, maxWidth: '240px' });
+map.on('click', ev => {
+  if (!ready) return;
+  const layers = ['inc-icon', 'poi-pontos', 'poi-fuel-far', 'fuel-ponto', 'fuel-area'].filter(id => map.getLayer(id));
+  const p = ev.point;
+  const f = map.queryRenderedFeatures([[p.x - 16, p.y - 16], [p.x + 16, p.y + 16]], { layers })[0];
+  if (!f) { popup.remove(); return; }
+  const pr = f.properties || {};
+  let tipo = '', nome = pr.name || '';
+  if (f.layer.id === 'inc-icon') {
+    tipo = INC_NOME[pr.cat] || 'Incidente';
+    nome = [pr.desc, (pr.from || pr.to) ? (pr.from + ' → ' + pr.to) : '',
+            pr.end ? 'até ' + String(pr.end).slice(0, 16).replace('T', ' ') : ''].filter(Boolean).join(' · ');
+  } else if (f.layer.id.startsWith('fuel-')) {
+    tipo = 'Bomba de combustível';
+  } else if (pr.class === 'parking') {
+    tipo = 'Estacionamento';
+  } else if (pr.class === 'charging_station' || pr.subclass === 'charging_station') {
+    tipo = 'Carregador elétrico';
+  } else if (pr.class === 'toilets' || pr.subclass === 'toilets') {
+    tipo = 'WC público';
+  } else if (pr.class === 'fuel') {
+    tipo = 'Bomba de combustível';
+  } else {
+    tipo = pr.class || 'Ponto';
+  }
+  const box = document.createElement('div');
+  box.style.cssText = 'font:14px system-ui,sans-serif;color:#14181c';
+  const t = document.createElement('b'); t.textContent = tipo; box.appendChild(t);
+  if (nome) { box.appendChild(document.createElement('br')); box.appendChild(document.createTextNode(nome)); }
+  popup.setLngLat(ev.lngLat).setDOMContent(box).addTo(map);
+});
+
+// dados.json (opcional): ficheiro exportado do Overpass; se cobrir a zona, não precisa de rede
+let localData;
+async function getLocal() {
+  if (localData !== undefined) return localData;
+  try {
+    let j = null;
+    for (const nome of ['dados.json', 'export.json']) {
+      try { const r = await fetch(nome); if (r.ok) { j = await r.json(); break; } } catch (e) {}
+    }
+    if (!j || !Array.isArray(j.elements)) throw new Error('sem ficheiro');
+    let s = 90, w = 180, n = -90, e = -180;
+    const eat = (la, lo) => { s = Math.min(s, la); n = Math.max(n, la); w = Math.min(w, lo); e = Math.max(e, lo); };
+    j.elements.forEach(el => {
+      if (el.lat != null) eat(el.lat, el.lon);
+      (el.geometry || []).forEach(g => eat(g.lat, g.lon));
+    });
+    j.ext = [s, w, n, e];
+    localData = j;
+  } catch (err) { localData = null; }
+  return localData;
+}
+
+async function loadParkInner() {
+  // bombas: áreas a vermelho só onde o dados.json/export.json cobre a zona; fora disso, pontos vermelhos do mapa base.
+  // Sem pedidos à rede e sem mensagens de erro.
+  if (!ready || busy || map.getZoom() < 15) return;
+  const c = map.getCenter();
+  if (lastFetch && lastFetch.distanceTo(c) < 300) return;
+  busy = true;
+  const L = await getLocal();
+  const inside = !!L && c.lat >= L.ext[0] && c.lat <= L.ext[2] && c.lng >= L.ext[1] && c.lng <= L.ext[3];
+  if (!inside) {
+    if (!fuelOut) {
+      fuelOut = true;
+      map.getSource('fuel').setData({ type: 'FeatureCollection', features: [] });
+      setFuelPts([]);
+      map.setLayerZoomRange('poi-fuel-far', 12, 24); // bombas do mapa base visíveis também de perto
+    }
+  } else {
+    fuelOut = false;
+    const fuelFeats = [];
+    L.elements.forEach(el => {
+      if (!el.tags || el.tags.amenity !== 'fuel') return;
+      const nome = el.tags.name || el.tags.brand || '';
+      if (el.type === 'node') {
+        fuelFeats.push({ type: 'Feature', properties: { name: nome }, geometry: { type: 'Point', coordinates: [el.lon, el.lat] } });
+      } else if (el.geometry && el.geometry.length > 3) {
+        const ring = el.geometry.map(g => [g.lon, g.lat]);
+        const f = ring[0], l = ring[ring.length - 1];
+        if (f[0] === l[0] && f[1] === l[1]) {
+          fuelFeats.push({ type: 'Feature', properties: { name: nome }, geometry: { type: 'Polygon', coordinates: [ring] } });
+        }
+      }
+    });
+    map.getSource('fuel').setData({ type: 'FeatureCollection', features: fuelFeats });
+    setFuelPts(fuelFeats);
+    map.setLayerZoomRange('poi-fuel-far', 12, 15);
+    lastFetch = c;
+  }
+  busy = false;
+}
+map.on('moveend', loadPark);
+
+function apply(p) {
+  const c = p.coords;
+  const v = (c.speed != null && !isNaN(c.speed)) ? c.speed * 3.6 : 0;
+  spd.textContent = Math.round(v);
+  curV = v;
+
+  numsOn = numsOn ? v < BACK : v < LIMIT;
+  chip.className = numsOn ? 'on' : '';
+  chip.textContent = plTxt || 'A localizar…';
+
+  if (c.heading != null && !isNaN(c.heading) && v > 5) bearing = c.heading;
+  const pos = [c.longitude, c.latitude];
+  me.setLngLat(pos).addTo(map);
+  me.setRotation(northUp ? bearing : 0);
+  placeUpdate(pos);
+  pickNearest(pos); placeDot();
+  routeTick(pos, c.accuracy);
+  perigoTick(pos);
+  radarTick(pos);
+
+  if (ready) map.setLayoutProperty('nums', 'visibility', numsOn ? 'visible' : 'none');
+
+  if (follow && ready) {
+    const h = window.innerHeight;
+    // com a barra da rota visível, sobe a seta para não ficar escondida atrás dela
+    let bot = 0;
+    if (!rbEl.hidden) bot = Math.max(0, h - rbEl.getBoundingClientRect().top + 12);
+    bot = Math.min(bot, Math.round(h * 0.7) - Math.round(h * 0.4));
+    map.easeTo({
+      center: pos, bearing: northUp ? 0 : bearing, zoom: numsOn ? 17.3 : 15.5,
+      padding: { top: Math.round(h * 0.4), bottom: bot, left: 0, right: 0 },
+      duration: 900, essential: true
+    });
+  }
+}
+
+function onPos(p) { last = p; apply(p); keepAwake(); fetchWx(); fetchInc(); }
+
+function onErr(e) {
+  chip.className = '';
+  chip.textContent = e.code === 1 ? 'Ativa a localização para este site' : 'Sem sinal de GPS';
+}
+
+if ('geolocation' in navigator) {
+  navigator.geolocation.watchPosition(onPos, onErr, { enableHighAccuracy: true, maximumAge: 1000, timeout: 20000 });
+} else {
+  chip.textContent = 'Este telemóvel não suporta GPS no browser';
+}
+
+map.on('dragstart', () => { follow = false; rec.hidden = false; autoFit = false; });
+// zoom com os dedos: deixa de seguir, senão a app volta a aproximar a cada posição
+map.on('zoomstart', e => { if (e.originalEvent) { follow = false; rec.hidden = false; autoFit = false; } });
+rec.addEventListener('click', () => { follow = true; rec.hidden = true; if (last) apply(last); });
+
+let lock = null;
+async function keepAwake() {
+  try {
+    if ('wakeLock' in navigator && !lock) {
+      lock = await navigator.wakeLock.request('screen');
+      lock.addEventListener('release', () => { lock = null; });
+    }
+  } catch (e) { lock = null; }
+}
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') keepAwake(); });
+
+// tempo: aviso (chuva, gelo, nevoeiro) e mapa mais escuro com chuva ou nevoeiro
+const wx = document.getElementById('wx');
+let wxOk = 0, wxTry = 0, wxPos = null;
+
+// limites de temperatura (°C) para os avisos de frio; ajustáveis
+const T_GELO = 0, T_RISCO = 3;
+function wxInfo(c) {
+  const code = c.weather_code, temp = c.temperature_2m, vis = c.visibility, precip = c.precipitation;
+  const nev = [45, 48].includes(code) || (vis != null && vis < 1000);
+  const chuva = [51, 53, 55, 61, 63, 65, 80, 81, 82, 95, 96, 99].includes(code) || precip >= 0.3;
+  const filter = nev ? 'brightness(0.82) contrast(1.1)' : chuva ? 'brightness(0.78) saturate(0.9)' : undefined;
+  let t = null;
+  if ([56, 57, 66, 67].includes(code)) t = '🧊 Chuva gelada';
+  else if ([71, 73, 75, 77, 85, 86].includes(code)) t = '❄️ Neve';
+  else if (temp != null && temp <= T_GELO) t = '🧊 Gelo provável';
+  else if (temp != null && temp <= T_RISCO && (chuva || precip > 0)) t = '🧊 Possível gelo';
+  else if (nev) t = '🌫️ Nevoeiro';
+  else if (chuva) t = '🌧️ Chuva';
+  else if (temp != null && temp <= T_RISCO) t = '🥶 Risco de gelo';
+  if (t === '❄️ Neve') return { t }; // neve não escurece o mapa
+  if (t) return { t, filter };
+  // tempo normal: só a temperatura, discreta, para se ver que a meteorologia está a funcionar
+  const dia = c.is_day !== 0;
+  return { ok: true, t: code <= 1 ? (dia ? '☀️' : '🌙') : code === 2 ? '⛅' : code === 3 ? '☁️' : '🌡️' };
+}
+
+function showWx(o, guardado) {
+  const cv = map.getCanvas();
+  cv.style.transition = 'filter 1s';
+  cv.style.filter = o && o.filter ? o.filter : '';
+  if (!o) { wx.hidden = true; return; }
+  wx.hidden = false;
+  wx.className = o.ok ? 'ok' : '';
+  wx.textContent = o.t + (o.temp != null ? ' ' + o.temp.toFixed(1).replace('.', ',') + '°' : '') + (guardado ? ' (guardado)' : '');
+}
+
+function falaTemp(t) {
+  const r = Math.round(t), a = Math.abs(r);
+  return (r < 0 ? 'menos ' : '') + a + (a === 1 ? ' grau' : ' graus');
+}
+// gelo, neve, nevoeiro e chuva forte: avisa por voz (uma vez em cada 30 min por tipo), quando estás em andamento
+function avisoTempo(o, c) {
+  const t = o && o.t || '', temp = o.temp, tt = temp != null ? ' Temperatura de ' + falaTemp(temp) + '.' : '';
+  let cls = null, frase = '';
+  if (t.indexOf('Chuva gelada') >= 0) { cls = 'gelo'; frase = 'Atenção, chuva gelada. Risco elevado de gelo na estrada.' + tt; }
+  else if (t.indexOf('Gelo provável') >= 0) { cls = 'gelo'; frase = 'Atenção, gelo provável na estrada.' + tt; }
+  else if (t.indexOf('Possível gelo') >= 0) { cls = 'gelo'; frase = 'Atenção, possível gelo na estrada.' + tt; }
+  else if (t.indexOf('Risco de gelo') >= 0) { cls = 'gelo'; frase = 'Atenção, risco de gelo na estrada.' + tt; }
+  else if (t.indexOf('Neve') >= 0) { cls = 'neve'; frase = 'Atenção, neve. Conduza com cuidado.'; }
+  else if (t.indexOf('Nevoeiro') >= 0) { cls = 'nevoeiro'; frase = 'Atenção, nevoeiro. Reduza a velocidade.'; }
+  else if (c && c.precipitation >= 2.5) { cls = 'chuva'; frase = 'Atenção, chuva forte. Reduza a velocidade.'; }
+  if (!cls) return;
+  const ant = wxFalado.get(cls);
+  if (ant && Date.now() - ant < 30 * 60 * 1000) return;
+  wxFalado.set(cls, Date.now());
+  wxPend = frase;         // dito assim que estiveres em andamento
+  perigoTick(null);
+}
+
+function wxErro(motivo) {
+  // só mostra o erro se ainda não houver nenhum valor recente
+  if (wxOk) return;
+  wx.hidden = false; wx.className = 'ok';
+  wx.textContent = '🌡️ Meteo: ' + motivo;
+}
+
+// quando se pede o tempo de novo: passados 5 min, ou se andaste mais de ~4 km (no mínimo 1 min entre pedidos)
+const WX_MS = 5 * 60 * 1000, WX_DLAT = 0.04, WX_DLON = 0.06, WX_GAP = 60 * 1000;
+async function fetchWx() {
+  if (Date.now() - wxTry < WX_GAP) return;
+  const lat = last ? last.coords.latitude : map.getCenter().lat;
+  const lon = last ? last.coords.longitude : map.getCenter().lng;
+  if (wxPos && Date.now() - wxOk < WX_MS && Math.abs(lat - wxPos[0]) < WX_DLAT && Math.abs(lon - wxPos[1]) < WX_DLON) return;
+  wxTry = Date.now();
+  if (!navigator.onLine) { wxErro('sem rede'); return; }
+  // primeiro com a visibilidade; se o serviço a recusar, tenta sem ela
+  const LISTAS = ['temperature_2m,precipitation,weather_code,is_day,visibility', 'temperature_2m,precipitation,weather_code,is_day'];
+  let c = null, motivo = '';
+  for (const v of LISTAS) {
+    const ctl = new AbortController();
+    const t = setTimeout(() => ctl.abort(), 8000);
+    try {
+      const r = await fetch('https://api.open-meteo.com/v1/forecast?latitude=' + lat.toFixed(3) + '&longitude=' + lon.toFixed(3) +
+        '&current=' + v + '&timezone=auto', { signal: ctl.signal });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const j = await r.json();
+      if (!j || !j.current) throw new Error('sem dados');
+      c = j.current;
+    } catch (e) {
+      motivo = e.name === 'AbortError' ? 'tempo esgotado' : (e instanceof TypeError ? 'bloqueado/rede' : e.message);
+    }
+    clearTimeout(t);
+    if (c) break;
+  }
+  if (!c) { wxErro(motivo); return; }
+  const o = wxInfo(c);
+  o.temp = c.temperature_2m;
+  wxOk = Date.now(); wxPos = [lat, lon];
+  showWx(o);
+  avisoTempo(o, c);
+  try { localStorage.setItem('wx', JSON.stringify({ t: wxOk, o })); } catch (e) {}
+}
+
+// ao abrir, usa o último valor se tiver menos de 3 horas
+try {
+  const sv = JSON.parse(localStorage.getItem('wx') || 'null');
+  if (sv && Date.now() - sv.t < 3 * 3600 * 1000) showWx(sv.o, true);
+} catch (e) {}
+
+// ---- localidade e código postal (na etiqueta de cima) ----
+// Nominatim (OpenStreetMap) dá a morada; guarda-se por zonas de ~200 m para funcionar sem rede onde já passaste.
+// Sem rede e sem guardado, usa o nome da localidade mais próxima dos mapas carregados, marcado com ≈ (sem código postal).
+let plTxt = '', plPos = null, plTry = 0, plBusy = false;
+let paisCC = null, paisT = 0, paisPos = null;   // país (código ISO) onde estás, para decidir se os radares podem avisar
+const ccCache = new Map();
+try { JSON.parse(localStorage.getItem('cc') || '[]').forEach(([k, v]) => ccCache.set(k, v)); } catch (e) {}
+const plCache = new Map();
+try { JSON.parse(localStorage.getItem('pl') || '[]').forEach(([k, v]) => plCache.set(k, v)); } catch (e) {}
+const plKey = p => Math.round(p[1] / 0.002) + ',' + Math.round(p[0] / 0.003);
+
+function plFormat(a) {
+  const nome = a.city || a.town || a.village || a.hamlet || a.municipality || a.suburb || '';
+  let cp = String(a.postcode || '').split(';')[0].trim();
+  if (!nome && !cp) return '';
+  if (cp && a.country_code === 'lu') cp = 'L-' + cp.replace(/^L-?\s*/i, '');
+  return (cp ? cp + ' ' : '') + nome;
+}
+
+function tilesPlace(pos) {
+  if (!ready) return '';
+  let best = '', bd = 4000;
+  try {
+    map.querySourceFeatures('openmaptiles', { sourceLayer: 'place' }).forEach(f => {
+      const pr = f.properties || {};
+      if (!['city', 'town', 'village', 'hamlet'].includes(pr.class) || !pr.name || f.geometry.type !== 'Point') return;
+      const d = geoDist(pos, f.geometry.coordinates);
+      if (d < bd) { bd = d; best = pr.name; }
+    });
+  } catch (e) {}
+  return best;
+}
+
+// sem valor fiável: se ainda estamos perto do último, mantém-no; senão usa o nome dos mapas (≈) ou diz que não há dados
+function plFallback(pos) {
+  if (plPos && geoDist(plPos, pos) < 1500) return;
+  const f = tilesPlace(pos);
+  plTxt = f ? '≈ ' + f : 'Localidade: sem dados';
+}
+
+async function placeUpdate(pos) {
+  const k = plKey(pos);
+  if (plCache.has(k)) { plTxt = plCache.get(k); plPos = pos; const c0 = ccCache.get(k); if (c0) { paisCC = c0; paisT = Date.now(); paisPos = pos; } return; }
+  if (plBusy || Date.now() < plTry) { plFallback(pos); return; }
+  plBusy = true; plTry = Date.now() + 15000; // no máximo um pedido de 15 em 15 segundos
+  try {
+    if (!navigator.onLine) throw new Error('sem rede');
+    const ctl = new AbortController();
+    const t = setTimeout(() => ctl.abort(), 6000);
+    let j;
+    try {
+      const r = await fetch('https://nominatim.openstreetmap.org/reverse?format=jsonv2&addressdetails=1&lat=' +
+        pos[1].toFixed(4) + '&lon=' + pos[0].toFixed(4), { signal: ctl.signal });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      j = await r.json();
+    } finally { clearTimeout(t); }
+    const txt = plFormat((j && j.address) || {});
+    if (!txt) throw new Error('sem localidade');
+    plCache.set(k, txt);
+    while (plCache.size > 300) plCache.delete(plCache.keys().next().value);
+    try { localStorage.setItem('pl', JSON.stringify([...plCache])); } catch (e) {}
+    const cc = j && j.address && j.address.country_code ? String(j.address.country_code).toLowerCase() : '';
+    if (cc) {
+      ccCache.set(k, cc);
+      while (ccCache.size > 300) ccCache.delete(ccCache.keys().next().value);
+      try { localStorage.setItem('cc', JSON.stringify([...ccCache])); } catch (e) {}
+      paisCC = cc; paisT = Date.now(); paisPos = pos;
+    }
+    plTxt = txt; plPos = pos;
+  } catch (e) {
+    plTry = Date.now() + 45000; // depois de uma falha, espera mais
+    plFallback(pos);
+  }
+  plBusy = false;
+}
+// ---- fim da localidade ----
+
+// ponto vermelho: direção da bomba mais próxima (em linha reta)
+const RAD = Math.PI / 180;
+let fuelPts = [], nearF = null, curPos = null, pickT = 0, fdOn = false;
+
+// bombas.json (opcional): lista grande só das bombas, de uma região larga, para o ponto vermelho
+// funcionar em qualquer percurso e sem rede (aceita o JSON do Overpass com "out center")
+let bigFuel = [];
+(async () => {
+  try {
+    const r = await fetch('bombas.json');
+    if (!r.ok) return;
+    const j = await r.json();
+    bigFuel = (j.elements || [])
+      .map(el => el.type === 'node' ? [el.lon, el.lat] : (el.center ? [el.center.lon, el.center.lat] : null))
+      .filter(p => p && isFinite(p[0]) && isFinite(p[1]));
+  } catch (e) {}
+})();
+function setFuelPts(fs) {
+  fuelPts = fs.map(f => {
+    if (f.geometry.type === 'Point') return f.geometry.coordinates;
+    const r = f.geometry.coordinates[0]; let x = 0, y = 0;
+    r.forEach(p => { x += p[0]; y += p[1]; });
+    return [x / r.length, y / r.length];
+  });
+}
+function geoDist(a, b) {
+  const dLat = (b[1] - a[1]) * RAD, dLon = (b[0] - a[0]) * RAD;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(a[1] * RAD) * Math.cos(b[1] * RAD) * Math.sin(dLon / 2) ** 2;
+  return 2 * 6371000 * Math.asin(Math.sqrt(h));
+}
+function geoBearing(a, b) {
+  const f1 = a[1] * RAD, f2 = b[1] * RAD, dl = (b[0] - a[0]) * RAD;
+  return (Math.atan2(Math.sin(dl) * Math.cos(f2), Math.cos(f1) * Math.sin(f2) - Math.sin(f1) * Math.cos(f2) * Math.cos(dl)) / RAD + 360) % 360;
+}
+function pickNearest(pos) {
+  curPos = pos;
+  if (Date.now() - pickT < 2500) return;
+  pickT = Date.now();
+  const cand = fuelPts.concat(bigFuel);
+  if (ready) {
+    try {
+      map.querySourceFeatures('openmaptiles', { sourceLayer: 'poi', filter: ['==', ['get', 'class'], 'fuel'] })
+        .forEach(f => { if (f.properties.subclass !== 'charging_station' && f.geometry.type === 'Point') cand.push(f.geometry.coordinates); });
+    } catch (e) {}
+  }
+  let best = null, bd = Infinity;
+  cand.forEach(p => { const d = geoDist(pos, p); if (d < bd) { bd = d; best = p; } });
+  nearF = best ? { p: best, d: bd } : null;
+}
+const fd = document.createElement('div');
+fd.className = 'fdot';
+fd.innerHTML = '<i></i><b></b>';
+const fdMark = new maplibregl.Marker({ element: fd, pitchAlignment: 'viewport', rotationAlignment: 'viewport' });
+const FUEL_MAX = 5000; // metros: o ponto só aparece quando a bomba mais próxima está a 5 km ou menos
+function placeDot() {
+  if (!nearF || !curPos || nearF.d > FUEL_MAX) { if (fdOn) { fdMark.remove(); fdOn = false; } return; }
+  const rel = (geoBearing(curPos, nearF.p) - map.getBearing()) * RAD, R = 48;
+  fdMark.setLngLat(curPos).setOffset([R * Math.sin(rel), -R * Math.cos(rel)]);
+  if (!fdOn) { fdMark.addTo(map); fdOn = true; }
+  const d = nearF.d;
+  fd.querySelector('b').textContent = d < 1000 ? Math.round(d / 10) * 10 + ' m' : (d / 1000).toFixed(1).replace('.', ',') + ' km';
+}
+map.on('rotate', placeDot);
+
+// ---- destino e rota (TomTom) ----
+// Pesquisa de morada com número (TomTom; Nominatim se falhar), rota com trânsito e parques perto do destino.
+// Precisa de rede para pesquisar e para calcular/recalcular a rota; uma rota já calculada continua no ecrã sem rede.
+let curV = 0, dest = null, route = null, routeT = 0, routeBusy = false, offCnt = 0, progT = 0, autoFit = false, destMark = null;
+const goBtn = document.getElementById('go'), spEl = document.getElementById('sp'), sqEl = document.getElementById('sq');
+const srEl = document.getElementById('sr'), rbEl = document.getElementById('rb'), rbt = document.getElementById('rbt');
+const rbn = document.getElementById('rbn'), rbp = document.getElementById('rbp');
+
+const fmtKm = m => m < 1000 ? Math.round(m / 10) * 10 + ' m' : (m / 1000).toFixed(1).replace('.', ',') + ' km';
+const fmtMin = s => { const m = Math.max(1, Math.round(s / 60)); return m < 60 ? m + ' min' : Math.floor(m / 60) + ' h ' + String(m % 60).padStart(2, '0'); };
+const fmtHora = ms => { const d = new Date(ms); return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); };
+
+let avisaN = 0;
+function avisa(txt) {
+  const n = ++avisaN;
+  info.hidden = false; info.textContent = txt;
+  setTimeout(() => { if (avisaN === n) info.hidden = true; }, 5000);
+}
+
+function abrePesquisa() {
+  spEl.hidden = false; sqEl.focus();
+}
+goBtn.addEventListener('click', abrePesquisa);
+document.getElementById('sx').addEventListener('click', () => { spEl.hidden = true; });
+document.getElementById('sb').addEventListener('click', pesquisa);
+sqEl.addEventListener('keydown', e => { if (e.key === 'Enter') pesquisa(); });
+
+async function pedido(url) {
+  const ctl = new AbortController();
+  const t = setTimeout(() => ctl.abort(), 9000);
+  try {
+    const r = await fetch(url, { signal: ctl.signal });
+    if (!r.ok) throw new Error(r.status === 429 ? 'limite diário atingido' : 'HTTP ' + r.status);
+    return await r.json();
+  } finally { clearTimeout(t); }
+}
+
+// devolve uma lista { nome, lat, lon, exato, aviso }; "exato" = a TomTom/OSM tem mesmo esse número de porta
+async function geocode(q) {
+  const lat = last ? last.coords.latitude : map.getCenter().lat, lon = last ? last.coords.longitude : map.getCenter().lng;
+  const querNum = /\d/.test(q);
+  try {
+    const j = await pedido('https://api.tomtom.com/search/2/geocode/' + encodeURIComponent(q) + '.json?key=' + KEY_TT +
+      '&limit=6&language=' + LG_TT + '&countrySet=LU,FR,BE,DE,PT,ES&lat=' + lat.toFixed(4) + '&lon=' + lon.toFixed(4));
+    const out = [];
+    (j.results || []).forEach(x => {
+      if (!x.position) return;
+      const exato = x.type === 'Point Address' || x.type === 'POI';
+      const nome = ((x.poi && x.poi.name) ? x.poi.name + ', ' : '') + ((x.address && x.address.freeformAddress) || '');
+      out.push({ nome, lat: x.position.lat, lon: x.position.lon, exato, aviso: querNum && !exato });
+    });
+    if (out.length) return out;
+  } catch (e) {}
+  const j = await pedido('https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&limit=5&q=' + encodeURIComponent(q));
+  return (j || []).map(x => {
+    const exato = !!(x.address && x.address.house_number);
+    return { nome: x.display_name, lat: +x.lat, lon: +x.lon, exato, aviso: querNum && !exato };
+  });
+}
+
+// número não existe: procura os mais próximos que existam (2 de diferença primeiro: mesmo lado da rua; depois 1)
+async function vizinhos(q, ref) {
+  const m = q.match(/(^|[\s,])(\d{1,3})([A-Za-z]?)(?=[\s,]|$)/);
+  if (!m) return [];
+  const n = +m[2];
+  const cands = [n - 2, n + 2, n - 1, n + 1].filter(c => c > 0);
+  const lat = ref.lat, lon = ref.lon;
+  const res = await Promise.all(cands.map(async c => {
+    const q2 = q.replace(m[0], m[1] + c);
+    try {
+      const j = await pedido('https://api.tomtom.com/search/2/geocode/' + encodeURIComponent(q2) + '.json?key=' + KEY_TT +
+        '&limit=1&language=' + LG_TT + '&countrySet=LU,FR,BE,DE,PT,ES&lat=' + lat.toFixed(4) + '&lon=' + lon.toFixed(4));
+      const x = (j.results || [])[0];
+      if (!x || x.type !== 'Point Address' || !x.position || !x.address || String(x.address.streetNumber) !== String(c)) return null;
+      if (geoDist([lon, lat], [x.position.lon, x.position.lat]) > 400) return null; // outra rua ou localidade
+      return { nome: x.address.freeformAddress || q2, lat: x.position.lat, lon: x.position.lon, exato: true, aviso: false, num: c, de: n };
+    } catch (e) { return null; }
+  }));
+  // no máximo um abaixo e um acima, os mais próximos de n
+  const ok = res.filter(Boolean).sort((a, b) => Math.abs(a.num - n) - Math.abs(b.num - n));
+  const baixo = ok.find(r => r.num < n), cima = ok.find(r => r.num > n);
+  return [baixo, cima].filter(Boolean).sort((a, b) => Math.abs(a.num - n) - Math.abs(b.num - n));
+}
+
+async function pesquisa() {
+  const q = sqEl.value.trim();
+  if (q.length < 3) return;
+  srEl.textContent = '';
+  const m = document.createElement('div'); m.className = 'msg'; m.textContent = 'A procurar…'; srEl.appendChild(m);
+  if (!navigator.onLine) { m.textContent = 'Sem rede: não dá para pesquisar moradas.'; return; }
+  let lista;
+  try { lista = await geocode(q); }
+  catch (e) { m.textContent = 'Falhou a pesquisa (' + (e.name === 'AbortError' ? 'tempo esgotado' : e.message) + ').'; return; }
+  srEl.textContent = '';
+  if (!lista.length) { m.textContent = 'Nada encontrado.'; srEl.appendChild(m); return; }
+  lista.forEach(it => {
+    const d = document.createElement('div'); d.className = 'it';
+    d.appendChild(document.createTextNode(it.nome));
+    const a = document.createElement('div');
+    a.className = it.aviso ? 'av' : 'ok';
+    a.textContent = it.aviso ? '⚠ número não encontrado: aponta para a rua' : (it.exato ? 'ponto exato' : 'rua / zona');
+    d.appendChild(a);
+    d.addEventListener('click', () => defineDestino(it));
+    srEl.appendChild(d);
+  });
+  // o número pedido não existe: oferece os vizinhos (ex.: 23 não existe -> 21 e 25)
+  const sem = lista.find(x => x.aviso);
+  if (sem && !lista.some(x => x.exato && !x.aviso && x.nome === sem.nome) && navigator.onLine) {
+    const w = document.createElement('div'); w.className = 'msg'; w.textContent = 'A procurar números vizinhos…'; srEl.appendChild(w);
+    let v = [];
+    try { v = await vizinhos(q, sem); } catch (e) {}
+    if (sqEl.value.trim() !== q) return; // entretanto escreveste outra coisa
+    if (!v.length) { w.textContent = 'Sem números vizinhos nos dados.'; return; }
+    w.remove();
+    v.forEach(it => {
+      const d = document.createElement('div'); d.className = 'it';
+      d.appendChild(document.createTextNode(it.nome));
+      const a = document.createElement('div'); a.className = 'ok';
+      a.textContent = 'nº ' + it.num + ' (vizinho do ' + it.de + ', que não existe nos dados)';
+      d.appendChild(a);
+      d.addEventListener('click', () => defineDestino(it));
+      srEl.appendChild(d);
+    });
+  }
+}
+
+function defineDestino(it) {
+  dest = { lat: it.lat, lon: it.lon, nome: it.nome, aviso: !!it.aviso };
+  spEl.hidden = true; sqEl.blur();
+  if (destMark) destMark.remove();
+  const el = document.createElement('div'); el.className = 'dst'; el.textContent = '🏁';
+  destMark = new maplibregl.Marker({ element: el, anchor: 'bottom' }).setLngLat([it.lon, it.lat]).addTo(map);
+  limpaParques();
+  calcRota(true);
+}
+
+// escolher o destino no mapa: toque longo (0,7 s) ou botão "Escolher no mapa" com cruz no centro
+async function nomeDe(lat, lon) {
+  try {
+    const j = await pedido('https://api.tomtom.com/search/2/reverseGeocode/' + lat.toFixed(5) + ',' + lon.toFixed(5) + '.json?key=' + KEY_TT + '&language=' + LG_TT);
+    const a = j.addresses && j.addresses[0] && j.addresses[0].address;
+    return (a && a.freeformAddress) || '';
+  } catch (e) { return ''; }
+}
+async function pontoMapa(lat, lon) {
+  try { navigator.vibrate && navigator.vibrate(40); } catch (e) {}
+  defineDestino({ nome: 'Ponto escolhido no mapa', lat, lon, exato: true, aviso: false });
+  const alvo = dest;
+  const n = await nomeDe(lat, lon);
+  if (n && dest === alvo) { dest.nome = n; if (route) mostraRota(route.total); }
+}
+let lpT = null, lpPt = null;
+const lpCancel = () => { clearTimeout(lpT); lpT = null; };
+map.on('touchstart', e => {
+  lpCancel();
+  if (!e.originalEvent || !e.originalEvent.touches || e.originalEvent.touches.length !== 1) return;
+  lpPt = e.point;
+  lpT = setTimeout(() => { lpT = null; pontoMapa(e.lngLat.lat, e.lngLat.lng); }, 700);
+});
+map.on('touchmove', e => { if (lpT && lpPt && e.point.dist(lpPt) > 12) lpCancel(); });
+['touchend', 'touchcancel', 'dragstart', 'zoomstart'].forEach(ev => map.on(ev, lpCancel));
+
+const cx = document.getElementById('cx'), pk = document.getElementById('pk');
+document.getElementById('sm').addEventListener('click', () => {
+  spEl.hidden = true; follow = false; autoFit = false; rec.hidden = false;
+  cx.hidden = false; pk.hidden = false;
+});
+document.getElementById('pkNo').addEventListener('click', () => { cx.hidden = true; pk.hidden = true; });
+document.getElementById('pkOk').addEventListener('click', () => {
+  const c = map.getContainer(), ll = map.unproject([c.clientWidth / 2, c.clientHeight / 2]);
+  cx.hidden = true; pk.hidden = true;
+  pontoMapa(ll.lat, ll.lng);
+});
+
+// botão Rumo/Norte: mapa com a frente do carro para cima, ou com o norte para cima
+const nb = document.getElementById('nb');
+function nbEstado() { nb.textContent = northUp ? 'Norte' : 'Rumo'; nb.classList.toggle('on', northUp); }
+nb.addEventListener('click', () => {
+  northUp = !northUp;
+  try { localStorage.setItem('nu', northUp ? '1' : '0'); } catch (e) {}
+  nbEstado();
+  me.setRotation(northUp ? bearing : 0);
+  map.easeTo({ bearing: northUp ? 0 : bearing, duration: 600 });
+});
+nbEstado();
+
+async function calcRota(ajusta, refaz) {
+  if (!dest || routeBusy) return;
+  rbEl.hidden = false;
+  if (!navigator.onLine) { if (!route) rbt.textContent = 'Sem rede: não dá para calcular a rota'; return; }
+  routeBusy = true;
+  if (!route) rbt.textContent = 'A calcular rota…';
+  const de = last ? [last.coords.latitude, last.coords.longitude] : [map.getCenter().lat, map.getCenter().lng];
+  try {
+    const j = await pedido('https://api.tomtom.com/routing/1/calculateRoute/' + de[0].toFixed(5) + ',' + de[1].toFixed(5) + ':' +
+      dest.lat.toFixed(5) + ',' + dest.lon.toFixed(5) + '/json?key=' + KEY_TT +
+      '&traffic=true&travelMode=car&routeType=fastest&computeTravelTimeFor=all&routeRepresentation=polyline&instructionsType=text&sectionType=traffic');
+    const rt = j.routes && j.routes[0];
+    if (!rt) throw new Error('sem rota');
+    const pts = [];
+    rt.legs.forEach(l => l.points.forEach(p => pts.push([p.longitude, p.latitude])));
+    if (pts.length < 2) throw new Error('rota vazia');
+    const cum = [0];
+    for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + geoDist(pts[i - 1], pts[i]));
+    const sm = rt.summary || {};
+    const ins = [];
+    ((rt.guidance && rt.guidance.instructions) || []).forEach(x => {
+      const m = x.maneuver;
+      if (!m || m === 'DEPART' || m === 'STRAIGHT' || m === 'FOLLOW') return; // "siga em frente" não interessa
+      const pi = x.pointIndex;
+      if (pi == null || pi < 0 || pi >= cum.length) return;
+      ins.push({ at: cum[pi], man: m, street: x.street || '', roads: x.roadNumbers || [], ex: x.exitNumber || '', rex: x.roundaboutExitNumber || 0, st: 0 });
+    });
+    const tr = [];
+    (rt.sections || []).forEach(x => {
+      if (x.sectionType && String(x.sectionType).toUpperCase() !== 'TRAFFIC') return;
+      const a = x.startPointIndex, b = x.endPointIndex;
+      if (a == null || b == null || a < 0 || b >= cum.length || b <= a) return;
+      const cat = String(x.simpleCategory || 'JAM').toUpperCase(), mag = x.magnitudeOfDelay, v = x.effectiveSpeedInKmh;
+      let cor;
+      if (cat === 'ROAD_CLOSURE') cor = '#5b0014';
+      else if (cat === 'ROAD_WORK') cor = '#f08c00';
+      else if (mag >= 3 || (v != null && v < 15)) cor = '#d62828';
+      else if (mag === 2 || (v != null && v < 35)) cor = '#f08c00';
+      else cor = '#f2c200';
+      tr.push({ a: cum[a], b: cum[b], cor, cat, delay: x.delayInSeconds || 0, v, p0: pts[a] });
+    });
+    route = { pts, cum, total: cum[cum.length - 1], tempo: sm.travelTimeInSeconds || 0, atraso: sm.trafficDelayInSeconds || 0, ins, gi: 0, tr, nextTr: null };
+    routeT = Date.now(); offCnt = 0; progT = 0;
+    map.getSource('rota').setData({ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: pts } });
+    if (ajusta) {
+      const b = new maplibregl.LngLatBounds(pts[0], pts[0]);
+      pts.forEach(p => b.extend(p));
+      follow = false; autoFit = true; rec.hidden = false;
+      map.fitBounds(b, { padding: { top: 90, bottom: 260, left: 40, right: 40 }, duration: 800, maxZoom: 16 });
+      setTimeout(() => { if (route && autoFit) { autoFit = false; follow = true; rec.hidden = true; if (last) apply(last); } }, 6000);
+    }
+    document.body.classList.add('rota');
+    try { document.getElementById('pn').hidden = true; } catch (e) {}
+    mostraRota(route.total);
+    if (!refaz) fala('Rota calculada. ' + falaTempo(route.tempo) + ', ' + falaDist(route.total) + '.');
+  } catch (e) {
+    if (!route) rbt.textContent = 'Rota falhou (' + (e.name === 'AbortError' ? 'tempo esgotado' : e.message) + ')';
+    else avisa('Não consegui atualizar a rota (' + (e.name === 'AbortError' ? 'tempo esgotado' : e.message) + ')');
+  }
+  routeBusy = false;
+}
+
+// mostra tempo, distância e hora de chegada; "rest" = metros que faltam
+function mostraRota(rest) {
+  if (!route) return;
+  const seg = route.total > 0 ? route.tempo * rest / route.total : 0;
+  rbt.textContent = fmtHora(Date.now() + seg * 1000) + ' · ' + fmtMin(seg) + ' · ' + fmtKm(rest);
+  const n = [];
+  if (dest && dest.nome) n.push(dest.nome.slice(0, 70));
+  if (route.atraso >= 120) n.push('+' + fmtMin(route.atraso) + ' por trânsito');
+  if (route.nextTr) n.push(route.nextTr);
+  if (dest && dest.aviso) n.push('⚠ número não encontrado, destino na rua');
+  rbn.hidden = !n.length; rbn.textContent = n.join(' · ');
+}
+
+function segDist(p, a, b) {
+  const kx = Math.cos(p[1] * RAD) * 111320, ky = 110540;
+  const px = (p[0] - a[0]) * kx, py = (p[1] - a[1]) * ky, bx = (b[0] - a[0]) * kx, by = (b[1] - a[1]) * ky;
+  const L = bx * bx + by * by;
+  let t = L ? (px * bx + py * by) / L : 0;
+  t = Math.max(0, Math.min(1, t));
+  return { d: Math.hypot(px - t * bx, py - t * by), t };
+}
+
+// a cada posição (no máximo 1 vez por segundo): progresso, fora de rota, chegada
+function routeTick(pos, acc) {
+  if (!route || Date.now() - progT < 1000) return;
+  progT = Date.now();
+  let best = Infinity, bi = 0, bt = 0;
+  for (let i = 0; i < route.pts.length - 1; i++) {
+    const r = segDist(pos, route.pts[i], route.pts[i + 1]);
+    if (r.d < best) { best = r.d; bi = i; bt = r.t; }
+  }
+  const trav = route.cum[bi] + bt * (route.cum[bi + 1] - route.cum[bi]);
+  const rest = Math.max(0, route.total - trav);
+  route.trav = trav;
+  guiaTick(trav);
+  barraTick(trav);
+  if (rest < 40 && geoDist(pos, [dest.lon, dest.lat]) < 60) {
+    rbt.textContent = 'Chegaste ao destino'; rbn.hidden = true;
+    return;
+  }
+  mostraRota(rest);
+  const lim = Math.max(60, (acc || 0) * 1.5);
+  offCnt = best > lim ? offCnt + 1 : 0;
+  if (offCnt >= 3 && Date.now() - routeT > 15000) { offCnt = 0; fala('A recalcular a rota.'); calcRota(false, true); return; }
+  if (Date.now() - routeT > 5 * 60 * 1000 && navigator.onLine) calcRota(false, true); // atualiza o trânsito de 5 em 5 min
+}
+
+function limpaParques() {
+  rbp.hidden = true; rbp.textContent = '';
+  if (ready && map.getSource('pperto')) map.getSource('pperto').setData({ type: 'FeatureCollection', features: [] });
+}
+
+// parques (P) mais perto do destino, entre os que o mapa tem carregados
+function parquesPerto() {
+  if (!dest) return;
+  follow = false; autoFit = false; rec.hidden = false;
+  map.jumpTo({ center: [dest.lon, dest.lat], zoom: 16, bearing: 0, padding: { top: 0, bottom: 120, left: 0, right: 0 } });
+  rbp.hidden = false; rbp.textContent = 'P perto do destino: a procurar…';
+  map.once('idle', () => {
+    const d0 = [dest.lon, dest.lat], vistos = new Set(), lista = [];
+    try {
+      map.querySourceFeatures('openmaptiles', { sourceLayer: 'poi', filter: ['==', ['get', 'class'], 'parking'] }).forEach(f => {
+        if (f.geometry.type !== 'Point') return;
+        const c = f.geometry.coordinates, k = c[0].toFixed(5) + ',' + c[1].toFixed(5);
+        if (vistos.has(k)) return;
+        vistos.add(k);
+        const d = geoDist(d0, c);
+        if (d < 700) lista.push({ c, d });
+      });
+    } catch (e) {}
+    lista.sort((a, b) => a.d - b.d);
+    // o mesmo parque aparece várias vezes (um ponto por mosaico/lugar): ignora o que está a menos de 40 m de outro já escolhido
+    const top = [], feats = [];
+    lista.forEach(x => { if (top.length < 3 && !top.some(y => geoDist(y.c, x.c) < 40)) top.push(x); });
+    top.forEach(x => {
+      feats.push({ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: [d0, x.c] } });
+      feats.push({ type: 'Feature', properties: { txt: fmtKm(x.d) }, geometry: { type: 'Point', coordinates: x.c } });
+    });
+    map.getSource('pperto').setData({ type: 'FeatureCollection', features: feats });
+    rbp.textContent = top.length ? 'P perto do destino: ' + top.map(x => fmtKm(x.d)).join(' · ') + ' (em linha reta)'
+                                 : 'Sem parques nos mapas carregados a menos de 700 m do destino';
+  });
+}
+
+document.getElementById('rbP').addEventListener('click', parquesPerto);
+document.getElementById('rbX').addEventListener('click', () => {
+  route = null; dest = null; autoFit = false;
+  if (destMark) { destMark.remove(); destMark = null; }
+  if (ready) map.getSource('rota').setData({ type: 'FeatureCollection', features: [] });
+  document.body.classList.remove('rota');
+  limpaParques(); guiaLimpa(); barraLimpa(); try { speechSynthesis.cancel(); } catch (e) {}
+  rbEl.hidden = true;
+  follow = true; rec.hidden = true; if (last) apply(last);
+});
+
+// ---- instruções curva a curva e voz ----
+// As frases são construídas aqui (português de Portugal) a partir do tipo de manobra da TomTom.
+const FALA_RUA = false; // true: diz também o nome da rua (a voz portuguesa lê mal nomes franceses)
+const tb = document.getElementById('tb'), tba = document.getElementById('tba'), tbd = document.getElementById('tbd'), tbs = document.getElementById('tbs'), tbn = document.getElementById('tbn');
+const vzBtn = document.getElementById('vz');
+let vozOn = true;
+try { vozOn = localStorage.getItem('vz') !== '0'; } catch (e) {}
+function vzEstado() { vzBtn.textContent = vozOn ? '🔊 Voz' : '🔇 Mudo'; vzBtn.classList.toggle('off', !vozOn); }
+vzEstado();
+
+const ORD = ['', 'primeira', 'segunda', 'terceira', 'quarta', 'quinta', 'sexta', 'sétima', 'oitava', 'nona'];
+function escolheVoz() {
+  try {
+    const vs = speechSynthesis.getVoices();
+    return FR ? (vs.find(v => /^fr[-_]FR/i.test(v.lang)) || vs.find(v => /^fr/i.test(v.lang)) || null) : (vs.find(v => /^pt[-_]PT/i.test(v.lang)) || vs.find(v => /^pt/i.test(v.lang)) || null);
+  } catch (e) { return null; }
+}
+let filaAv = [];
+function falaRaw(t) {
+  const u = new SpeechSynthesisUtterance(frTr(t));
+  u.lang = LG_TT; u.rate = 1;
+  const v = escolheVoz(); if (v) u.voice = v;
+  u.onend = u.onerror = () => setTimeout(flushAv, 200);
+  speechSynthesis.speak(u);
+}
+// avisos que esperaram por uma instrução de navegação
+function flushAv() {
+  try {
+    if (!filaAv.length || speechSynthesis.speaking || speechSynthesis.pending) return;
+    falaRaw(filaAv.shift());
+  } catch (e) {}
+}
+// instruções de navegação: passam à frente de tudo o que estiver a ser dito
+function fala(t) {
+  if (!vozOn || !t || !('speechSynthesis' in window)) return;
+  try {
+    speechSynthesis.cancel();
+    falaRaw(t);
+  } catch (e) {}
+}
+// avisos de perigo: esperam a sua vez e não cortam uma instrução de curva
+function falaAviso(t) {
+  if (!vozOn || !t || !('speechSynthesis' in window)) return;
+  try {
+    if (speechSynthesis.speaking || speechSynthesis.pending) { filaAv.push(t); setTimeout(flushAv, 4000); return; }
+    falaRaw(t);
+  } catch (e) {}
+}
+vzBtn.addEventListener('click', () => {
+  vozOn = !vozOn;
+  try { localStorage.setItem('vz', vozOn ? '1' : '0'); } catch (e) {}
+  vzEstado();
+  if (vozOn) {
+    fala('Voz ativada.');
+    setTimeout(() => { if (!escolheVoz()) avisa('Sem voz portuguesa. Instala-a em Definições > Gestão geral > Texto para voz'); }, 1500);
+  } else { try { speechSynthesis.cancel(); } catch (e) {} }
+});
+
+function falaTempo(sg) {
+  const m = Math.max(1, Math.round(sg / 60)), h = Math.floor(m / 60), r = m % 60;
+  if (!h) return m + (m === 1 ? ' minuto' : ' minutos');
+  return h + (h === 1 ? ' hora' : ' horas') + (r ? ' e ' + r + (r === 1 ? ' minuto' : ' minutos') : '');
+}
+function falaDist(m) {
+  if (m < 950) { const r = m < 500 ? 50 : 100; return Math.max(r, Math.round(m / r) * r) + ' metros'; }
+  const k = Math.round(m / 100) / 10;
+  return (k === 1 ? '1 quilómetro' : String(k).replace('.', ',') + ' quilómetros');
+}
+
+function frase(it) {
+  const m = it.man, via = it.roads[0] ? ' ' + it.roads[0].replace(/\s+/g, ' ') : '';
+  const rua = (FALA_RUA && it.street) ? ' para ' + it.street : '';
+  const saida = it.ex ? ' número ' + it.ex : '';
+  const rot = it.rex ? (ORD[it.rex] ? 'na rotunda, saia na ' + ORD[it.rex] + ' saída' : 'na rotunda, saia na saída número ' + it.rex) : '';
+  switch (m) {
+    case 'TURN_LEFT': return 'vire à esquerda' + rua;
+    case 'TURN_RIGHT': return 'vire à direita' + rua;
+    case 'SHARP_LEFT': return 'vire acentuadamente à esquerda' + rua;
+    case 'SHARP_RIGHT': return 'vire acentuadamente à direita' + rua;
+    case 'BEAR_LEFT': return 'siga ligeiramente à esquerda' + rua;
+    case 'BEAR_RIGHT': return 'siga ligeiramente à direita' + rua;
+    case 'KEEP_LEFT': return 'mantenha-se à esquerda' + rua;
+    case 'KEEP_RIGHT': return 'mantenha-se à direita' + rua;
+    case 'MAKE_UTURN': case 'TRY_MAKE_UTURN': return 'faça inversão de marcha';
+    case 'ENTER_MOTORWAY': case 'ENTER_FREEWAY': case 'ENTER_HIGHWAY': return 'entre na autoestrada' + via;
+    case 'MOTORWAY_EXIT_LEFT': return 'saia à esquerda' + (saida ? ', saída' + saida : '');
+    case 'MOTORWAY_EXIT_RIGHT': return 'saia à direita' + (saida ? ', saída' + saida : '');
+    case 'TAKE_EXIT': return 'saia' + (saida ? ', saída' + saida : '');
+    case 'ENTRANCE_RAMP': return 'entre na rampa' + via;
+    case 'ROUNDABOUT_CROSS': return rot || 'na rotunda, siga em frente';
+    case 'ROUNDABOUT_LEFT': case 'ROUNDABOUT_RIGHT': return rot || 'na rotunda, saia à ' + (m === 'ROUNDABOUT_LEFT' ? 'esquerda' : 'direita');
+    case 'ROUNDABOUT_BACK': return 'na rotunda, volte para trás';
+    case 'SWITCH_MAIN_ROAD': return 'mude para a estrada principal';
+    case 'SWITCH_PARALLEL_ROAD': return 'mude para a estrada paralela';
+    case 'TAKE_FERRY': return 'apanhe o ferry';
+    case 'ARRIVE_LEFT': return 'chegou ao destino, fica à esquerda';
+    case 'ARRIVE_RIGHT': return 'chegou ao destino, fica à direita';
+    case 'ARRIVE': return 'chegou ao destino';
+    default: return 'siga as indicações';
+  }
+}
+const SETA = { TURN_LEFT: '⬅️', TURN_RIGHT: '➡️', SHARP_LEFT: '↙️', SHARP_RIGHT: '↘️', BEAR_LEFT: '↖️', BEAR_RIGHT: '↗️',
+  KEEP_LEFT: '↖️', KEEP_RIGHT: '↗️', MAKE_UTURN: '↩️', TRY_MAKE_UTURN: '↩️', ENTER_MOTORWAY: '🛣️', ENTER_FREEWAY: '🛣️', ENTER_HIGHWAY: '🛣️',
+  MOTORWAY_EXIT_LEFT: '↖️', MOTORWAY_EXIT_RIGHT: '↗️', TAKE_EXIT: '↗️', ROUNDABOUT_CROSS: '🔄', ROUNDABOUT_LEFT: '🔄', ROUNDABOUT_RIGHT: '🔄',
+  ROUNDABOUT_BACK: '🔄', ARRIVE: '🏁', ARRIVE_LEFT: '🏁', ARRIVE_RIGHT: '🏁' };
+function rotulo(it) {
+  const p = [];
+  if (it.rex) p.push(it.rex + 'ª saída');
+  if (it.ex && !it.rex) p.push('saída ' + it.ex);
+  const nome = it.street || (it.roads && it.roads[0]) || '';
+  if (nome) p.push(nome);
+  return p.join(' · ');
+}
+function distTxt(m) { return m < 1000 ? (m < 200 ? Math.round(m / 10) * 10 : Math.round(m / 50) * 50) + ' m' : (m / 1000).toFixed(1).replace('.', ',') + ' km'; }
+
+// "e depois ...": se a manobra seguinte vem logo a seguir, a voz avisa já das duas
+function encadeia(i, v) {
+  const n = route.ins[i + 1];
+  if (!n || n.man.startsWith('ARRIVE')) return '';
+  const gap = n.at - route.ins[i].at, lim = Math.max(150, Math.min(400, v * 12));
+  if (gap > lim) return '';
+  return (gap < 120 ? ', e logo a seguir, ' : ', e depois, dentro de ' + falaDist(gap) + ', ') + frase(n);
+}
+
+// a cada posição: passa à instrução seguinte, atualiza a faixa e avisa por voz
+function guiaTick(trav) {
+  if (!route || !route.ins || !route.ins.length) { guiaLimpa(); return; }
+  const I = route.ins;
+  while (route.gi < I.length - 1 && trav > I[route.gi].at + 25 && !I[route.gi].man.startsWith('ARRIVE')) route.gi++;
+  const it = I[route.gi];
+  if (!it || (trav > it.at + 25 && !it.man.startsWith('ARRIVE'))) { guiaLimpa(); return; }
+  const d = Math.max(0, it.at - trav);
+  tb.hidden = false; document.body.classList.add('nav');
+  tba.textContent = SETA[it.man] || '⬆️';
+  tbd.textContent = distTxt(d);
+  tbs.textContent = rotulo(it);
+  const nx = I[route.gi + 1];
+  if (nx && nx.at - it.at <= 500) { tbn.hidden = false; tbn.textContent = 'Depois: ' + (SETA[nx.man] || '⬆️') + ' ' + distTxt(nx.at - it.at); }
+  else tbn.hidden = true;
+  const v = curV / 3.6;                                  // m/s
+  const dFar = Math.min(1500, Math.max(250, v * 30));   // primeiro aviso, ~30 s antes
+  const dNear = Math.min(150, Math.max(40, v * 8));     // segundo aviso, ~8 s antes
+  if (it.st < 2 && d <= dNear) { fala(frase(it) + encadeia(route.gi, v)); it.st = 2; }
+  else if (it.st < 1 && !it.man.startsWith('ARRIVE') && d <= dFar && d > dNear * 1.5 + 60) {
+    fala('Dentro de ' + falaDist(d) + ', ' + frase(it) + encadeia(route.gi, v)); it.st = 1;
+  }
+}
+function guiaLimpa() {
+  tb.hidden = true; document.body.classList.remove('nav');
+}
+
+// ---- avisos de perigo por voz ----
+// Com rota ativa: perigos que estão em cima do percurso. Sem rota: perigos na direção em que vais.
+function perigoTick(pos) {
+  if (wxPend && curV > 10) { falaAviso(wxPend); wxPend = null; }
+  if (!pos || curV < 10 || Date.now() - perigoT < 3000) return;
+  if (!perigos.length && !(route && route.tr && route.tr.length)) return;
+  perigoT = Date.now();
+  const v = curV / 3.6, dAv = Math.min(2500, Math.max(600, v * 45));
+  let melhor = null;
+  const noRota = route && route.pts && route.trav != null;
+  perigos.forEach(h => {
+    const q = avisados.get(h.key);
+    if (q && Date.now() - q < 30 * 60 * 1000) return;
+    let dmin = Infinity;
+    h.pts.forEach(p => {
+      const d0 = geoDist(pos, p);
+      if (d0 > dAv + 300) return;
+      let ahead = null;
+      if (noRota) {
+        let bd = Infinity, bi = 0, bt = 0;
+        for (let i = 0; i < route.pts.length - 1; i++) {
+          const r = segDist(p, route.pts[i], route.pts[i + 1]);
+          if (r.d < bd) { bd = r.d; bi = i; bt = r.t; }
+        }
+        if (bd < 40) ahead = route.cum[bi] + bt * (route.cum[bi + 1] - route.cum[bi]) - route.trav;
+      } else if (d0 <= dAv) {
+        const dif = Math.abs(((geoBearing(pos, p) - bearing + 540) % 360) - 180);
+        if (dif <= 35) ahead = d0;
+      }
+      if (ahead != null && ahead >= 0 && ahead <= dAv && ahead < dmin) dmin = ahead;
+    });
+    if (dmin < Infinity && (!melhor || dmin < melhor.d)) melhor = { chave: h.key, nome: PERIGO_NOME[h.cat], d: dmin };
+  });
+  // trânsito parado ou estrada cortada no percurso (dados da rota)
+  if (noRota && route.tr) route.tr.forEach(t => {
+    const grave = t.cat === 'ROAD_CLOSURE' || (t.cat === 'JAM' && t.delay >= 60 && (t.v == null || t.v < 30));
+    if (!grave || !t.p0) return;
+    const chave = 'tr:' + t.cat + t.p0[0].toFixed(3) + ',' + t.p0[1].toFixed(3);
+    const q = avisados.get(chave);
+    if (q && Date.now() - q < 30 * 60 * 1000) return;
+    const ahead = t.a - route.trav;
+    if (ahead < 0 || ahead > dAv) return;
+    if (!melhor || ahead < melhor.d) melhor = { chave, nome: t.cat === 'ROAD_CLOSURE' ? 'estrada cortada' : 'trânsito lento', d: ahead };
+  });
+  if (!melhor) return;
+  avisados.set(melhor.chave, Date.now());
+  falaAviso('Atenção, ' + melhor.nome + (melhor.d < 200 ? ' logo à frente.' : ' a ' + falaDist(melhor.d) + '.'));
+}
+// ---- fim das instruções e voz ----
+
+// ---- avisos de radar (só onde é permitido) ----
+// Luxemburgo e Bélgica: avisos permitidos para apps. França: só 'zona de perigo' (opcional, desligado por defeito); R413-15 proíbe indicar a localização.
+// Alemanha: o condutor não pode usar a função de aviso. Por isso a app só avisa quando sabe que estás em LU ou BE.
+// Dados: radares.json (exportação do overpass-turbo). Sem esse ficheiro, não avisa.
+const RADAR_PAISES = ['lu', 'be'];
+let radares = [], radarT = 0;
+const radarAvisado = new Map();
+async function carregaRadares() {
+  try {
+    const r = await fetch('radares.json');
+    if (!r.ok) throw new Error('sem ficheiro');
+    const j = await r.json();
+    const els = (j && j.elements) || [];
+    const limite = t => { const m = parseInt(t, 10); return (m > 0 && !/mph/i.test(String(t))) ? m : null; };
+    const vias = els.filter(e => e.type === 'way' && e.geometry && e.geometry.length > 1 && e.tags && limite(e.tags.maxspeed));
+    radares = els.filter(e => e.type === 'node' && e.tags && e.tags.highway === 'speed_camera' && e.lat != null && e.lon != null).map(e => {
+      let lim = limite(e.tags.maxspeed);
+      if (!lim) { // sem limite no radar: usa o da via mais próxima (até 40 m)
+        let bd = 40;
+        vias.forEach(w => {
+          for (let i = 0; i < w.geometry.length - 1; i++) {
+            const a = w.geometry[i], b = w.geometry[i + 1];
+            const d = segDist([e.lon, e.lat], [a.lon, a.lat], [b.lon, b.lat]).d;
+            if (d < bd) { bd = d; lim = limite(w.tags.maxspeed); }
+          }
+        });
+      }
+      return { lon: e.lon, lat: e.lat, lim, key: 'rd:' + e.id };
+    });
+  } catch (e) { radares = []; }
+}
+// só avisa se o país foi confirmado há pouco tempo, aqui perto, e é um dos permitidos
+// França: só "zona de perigo" (sem posição exata, sem a palavra radar), e só se ligares tu no painel de pesquisa
+let zdOn = false; try { zdOn = localStorage.getItem('zd') === '1'; } catch (e) {}
+const zdBtn = document.getElementById('zd');
+function zdUi() { zdBtn.textContent = 'Zonas de perigo (França): ' + (zdOn ? 'ligado' : 'desligado'); }
+zdUi();
+zdBtn.addEventListener('click', () => { zdOn = !zdOn; try { localStorage.setItem('zd', zdOn ? '1' : '0'); } catch (e) {} zdUi(); });
+function hashF(k) { let h = 0; for (let i = 0; i < k.length; i++) h = (h * 31 + k.charCodeAt(i)) >>> 0; return 0.25 + (h % 1000) / 1000 * 0.5; }
+function radarPermitido(pos) {
+  return !!paisCC && (RADAR_PAISES.includes(paisCC) || (paisCC === 'fr' && zdOn)) && Date.now() - paisT < 90000 && !!paisPos && geoDist(paisPos, pos) < 2000;
+}
+function radarTick(pos) {
+  if (!radares.length || curV < 10 || Date.now() - radarT < 2000) return;
+  radarT = Date.now();
+  if (!radarPermitido(pos)) return;
+  const fr = paisCC === 'fr';
+  const v = curV / 3.6, dAv = fr ? 3200 : Math.min(1000, Math.max(400, v * 25));
+  const zonaL = r => { const l = r.lim || (curV < 60 ? 50 : curV < 100 ? 80 : 130); return l <= 50 ? 500 : l <= 100 ? 2000 : 4000; };
+  const noRota = route && route.pts && route.trav != null;
+  let melhor = null;
+  radares.forEach(r => {
+    if (Math.abs(r.lat - pos[1]) > (fr ? 0.03 : 0.012) || Math.abs(r.lon - pos[0]) > (fr ? 0.045 : 0.02)) return;
+    const q = radarAvisado.get(r.key);
+    if (q && Date.now() - q < 10 * 60 * 1000) return;
+    const p = [r.lon, r.lat], d0 = geoDist(pos, p);
+    const zl = fr ? zonaL(r) : 0, zf = fr ? hashF(r.key) : 0;
+    const dMax = fr ? zl * zf : dAv;
+    if (d0 > dMax + 200) return;
+    let ahead = null;
+    if (noRota) {
+      let bd = Infinity;
+      for (let i = 0; i < route.pts.length - 1; i++) { const x = segDist(p, route.pts[i], route.pts[i + 1]); if (x.d < bd) bd = x.d; }
+      if (bd < 40) ahead = d0;
+    } else if (d0 <= dAv) {
+      const dif = Math.abs(((geoBearing(pos, p) - bearing + 540) % 360) - 180);
+      if (dif <= 35) ahead = d0;
+    }
+    if (ahead != null && ahead <= dMax && (!melhor || ahead < melhor.d)) melhor = { r, d: ahead, zl, zf };
+  });
+  if (!melhor) return;
+  radarAvisado.set(melhor.r.key, Date.now());
+  if (fr) {
+    const rem = Math.max(300, Math.round((melhor.d + (1 - melhor.zf) * melhor.zl) / 100) * 100);
+    avisa('⚠️ Zona de perigo · ' + (rem >= 1000 ? (rem / 1000).toFixed(1).replace('.', ',') + ' km' : rem + ' m'));
+    falaAviso('Atenção, zona de perigo nos próximos ' + (rem >= 1000 ? (rem / 1000).toFixed(1).replace('.', ',') + ' quilómetros.' : rem + ' metros.'));
+    return;
+  }
+  const lim = melhor.r.lim;
+  avisa('📷 Radar' + (lim ? ' · limite ' + lim + ' km/h' : ''));
+  falaAviso('Atenção, aproxima-se de um radar.' + (lim ? ' Limite de velocidade, ' + lim + ' quilómetros por hora.' : ''));
+}
+carregaRadares();
+// ---- fim dos avisos de radar ----
+
+// ---- estacionamento de livraison (P verde) ----
+async function carregaLiv() {
+  try {
+    const r = await fetch('livraison.json');
+    if (!r.ok) throw new Error('sem ficheiro');
+    const j = await r.json();
+    const feats = [];
+    ((j && j.elements) || []).forEach(e => {
+      const lat = e.lat != null ? e.lat : (e.center && e.center.lat), lon = e.lon != null ? e.lon : (e.center && e.center.lon);
+      if (lat == null || lon == null) return;
+      feats.push({ type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: [lon, lat] } });
+    });
+    const put = () => { const src = map.getSource('liv'); if (src) src.setData({ type: 'FeatureCollection', features: feats }); else map.once('load', put); };
+    put();
+  } catch (e) {}
+}
+carregaLiv();
+// ---- fim do estacionamento de livraison ----
+
+// ---- barra lateral do trânsito no trajeto ----
+// Do fundo (a tua seta, com os km que faltam) ao topo (bandeira). Pista cinzenta; trânsito a cores; ícones nos problemas.
+const tfb = document.getElementById('tfb'), trk = document.getElementById('trk'), tlb = document.getElementById('tlb');
+const NOMES_TR = { JAM: 'Trânsito', ROAD_WORK: 'Obras', ROAD_CLOSURE: 'Estrada cortada', OTHER: 'Incidente' };
+let tfIcons = [];
+function barraTick(trav) {
+  const rem = route.total - trav;
+  if (!route.tr || rem <= 0) { barraLimpa(); return; }
+  // o ecrã do browser é baixo: mede o espaço entre a faixa de instruções e a barra da rota
+  const top = (tb.hidden ? 62 : tb.getBoundingClientRect().bottom) + 8;
+  const bot = rbEl.hidden ? 100 : Math.max(0, window.innerHeight - rbEl.getBoundingClientRect().top + 8);
+  if (window.innerHeight - top - bot < 110) { tfb.hidden = true; return; } // sem espaço para desenhar a barra
+  tfb.style.top = Math.round(top) + 'px'; tfb.style.bottom = Math.round(bot) + 'px';
+  tfb.hidden = false;
+  tlb.textContent = rem >= 10000 ? Math.round(rem / 1000) + ' km' : distTxt(rem);
+  trk.textContent = '';
+  tfIcons.forEach(e => e.remove()); tfIcons = [];
+  const th = trk.offsetHeight, tt = trk.offsetTop;
+  let prox = null, ultimoY = null;
+  route.tr.filter(t => t.b > trav).sort((x, y) => x.a - y.a).forEach(t => {
+    const a = Math.max(t.a, trav), b = t.b;
+    const i = document.createElement('i');
+    i.style.background = t.cor;
+    i.style.bottom = ((a - trav) / rem * 100) + '%';
+    i.style.height = Math.max(0.4, (b - a) / rem * 100) + '%';
+    trk.appendChild(i);
+    if (!prox || a < prox.a) prox = { a, t };
+    const sym = t.cat === 'ROAD_CLOSURE' ? '⛔' : t.cat === 'ROAD_WORK' ? '🚧' : t.cat === 'OTHER' ? '⚠️' : (t.delay >= 120 ? '🚗' : '');
+    if (!sym) return;
+    const y = tt + th * (1 - (((a + b) / 2) - trav) / rem);
+    if (ultimoY !== null && Math.abs(ultimoY - y) < 30) return; // evita ícones em cima uns dos outros
+    ultimoY = y;
+    const ic = document.createElement('div');
+    ic.className = 'ic'; ic.style.top = Math.round(y - 12) + 'px'; ic.style.borderColor = t.cor; ic.textContent = sym;
+    tfb.appendChild(ic); tfIcons.push(ic);
+  });
+  if (prox && prox.a - trav < 40000) {
+    const d = Math.max(0, prox.a - trav);
+    route.nextTr = NOMES_TR[prox.t.cat] + ' à frente: ' + distTxt(d) + (prox.t.delay >= 60 ? ' (+' + fmtMin(prox.t.delay) + ')' : '');
+  } else route.nextTr = null;
+}
+function barraLimpa() { tfb.hidden = true; trk.textContent = ''; tfIcons.forEach(e => e.remove()); tfIcons = []; }
+// ---- fim da barra do trânsito ----
+// ---- fim do destino e rota ----
+
+// incidentes de trânsito (TomTom): acidentes, obras, estradas cortadas
+const INC_NOME = { 0: 'Incidente', 1: 'Acidente', 2: 'Nevoeiro', 3: 'Condições perigosas', 4: 'Chuva forte', 5: 'Gelo',
+  7: 'Faixa cortada', 8: 'Estrada cortada', 9: 'Obras', 10: 'Vento forte', 11: 'Inundação', 14: 'Veículo avariado' };
+let incOk = 0, incTry = 0, incPos = null;
+// perigos avisados por voz (categorias TomTom): 1 acidente, 2 nevoeiro, 3 condições perigosas, 5 gelo, 7 faixa cortada,
+// 8 estrada cortada, 10 vento, 11 inundação, 14 veículo avariado. Obras (9) e chuva (4) só se vêem no mapa.
+const PERIGO_NOME = { 1: 'acidente', 2: 'nevoeiro', 3: 'condições perigosas na estrada', 5: 'gelo na estrada', 7: 'faixa cortada',
+  8: 'estrada cortada', 10: 'vento forte', 11: 'inundação', 14: 'veículo avariado' };
+let perigos = [], perigoT = 0, wxPend = null;
+const avisados = new Map(), wxFalado = new Map();
+
+function mkIcon(nome, fn) {
+  const c = document.createElement('canvas');
+  c.width = c.height = 64;
+  const x = c.getContext('2d');
+  fn(x);
+  map.addImage(nome, x.getImageData(0, 0, 64, 64), { pixelRatio: 2 });
+}
+function disco(x, cor) {
+  x.beginPath(); x.arc(32, 32, 28, 0, Math.PI * 2);
+  x.fillStyle = cor; x.fill();
+  x.lineWidth = 4; x.strokeStyle = '#fff'; x.stroke();
+  x.textAlign = 'center'; x.textBaseline = 'middle';
+}
+function criaIconesInc() {
+  mkIcon('inc-acc', x => { disco(x, '#d62828'); x.fillStyle = '#fff'; x.font = 'bold 38px sans-serif'; x.fillText('!', 32, 35); });
+  mkIcon('inc-fecha', x => { disco(x, '#d62828'); x.fillStyle = '#fff'; x.fillRect(14, 27, 36, 10); });
+  mkIcon('inc-faixa', x => { disco(x, '#f08c00'); x.fillStyle = '#fff'; x.fillRect(14, 27, 36, 10); });
+  mkIcon('inc-obras', x => { disco(x, '#f08c00'); x.font = '32px sans-serif'; x.fillText('🚧', 32, 35); });
+  mkIcon('inc-outro', x => { disco(x, '#e0a800'); x.fillStyle = '#14181c'; x.font = 'bold 38px sans-serif'; x.fillText('!', 32, 35); });
+}
+
+async function fetchInc() {
+  if (!(trOn || vozOn) || !ready) return;
+  if (Date.now() - incTry < 120000) return;
+  const lat = last ? last.coords.latitude : map.getCenter().lat;
+  const lon = last ? last.coords.longitude : map.getCenter().lng;
+  if (incPos && Date.now() - incOk < 300000 && Math.abs(lat - incPos[0]) < 0.06 && Math.abs(lon - incPos[1]) < 0.09) return;
+  incTry = Date.now();
+  const bbox = [lon - 0.18, lat - 0.12, lon + 0.18, lat + 0.12].map(v => v.toFixed(4)).join(',');
+  const fields = '{incidents{type,geometry{type,coordinates},properties{iconCategory,magnitudeOfDelay,events{description,code,iconCategory},startTime,endTime,from,to,length}}}';
+  let j = null;
+  for (const lang of [LG_TT, 'en-GB']) {
+    const ctl = new AbortController();
+    const t = setTimeout(() => ctl.abort(), 10000);
+    try {
+      const r = await fetch('https://api.tomtom.com/traffic/services/5/incidentDetails?key=' + KEY_TT +
+        '&bbox=' + bbox + '&fields=' + encodeURIComponent(fields) + '&language=' + lang + '&timeValidityFilter=present', { signal: ctl.signal });
+      if (r.ok) { j = await r.json(); clearTimeout(t); break; }
+    } catch (e) {}
+    clearTimeout(t);
+  }
+  if (!j) return;
+  const feats = [];
+  const novos = [];
+  (j.incidents || []).forEach(it => {
+    const p = it.properties || {}, cat = p.iconCategory, g = it.geometry;
+    if (cat === 6 || !g) return; // trânsito lento já se vê nas cores das estradas
+    const ev = (p.events && p.events[0]) || {};
+    const base = {
+      cat: cat, desc: ev.description || '', from: p.from || '', to: p.to || '', end: p.endTime || '',
+      img: cat === 1 ? 'inc-acc' : cat === 8 ? 'inc-fecha' : cat === 7 ? 'inc-faixa' : cat === 9 ? 'inc-obras' : 'inc-outro'
+    };
+    if (PERIGO_NOME[cat]) {
+      const cs = g.type === 'Point' ? [g.coordinates] : (g.type === 'LineString' ? g.coordinates : []);
+      const passo = Math.max(1, Math.ceil(cs.length / 20));
+      const amostra = cs.filter((c, i) => i % passo === 0 || i === cs.length - 1);
+      if (amostra.length) novos.push({ cat, pts: amostra, key: cat + ':' + amostra[0][0].toFixed(3) + ',' + amostra[0][1].toFixed(3) });
+    }
+    let pt;
+    if (g.type === 'Point') pt = g.coordinates;
+    else if (g.type === 'LineString' && g.coordinates.length) {
+      pt = g.coordinates[Math.floor(g.coordinates.length / 2)];
+      feats.push({ type: 'Feature', properties: base, geometry: { type: 'LineString', coordinates: g.coordinates } });
+    } else return;
+    feats.push({ type: 'Feature', properties: base, geometry: { type: 'Point', coordinates: pt } });
+  });
+  map.getSource('inc').setData({ type: 'FeatureCollection', features: feats });
+  perigos = novos;
+  incOk = Date.now(); incPos = [lat, lon];
+}
+
+// botão do trânsito
+function setTrafego(on) {
+  trOn = on;
+  trBtn.classList.toggle('on', on);
+  try { localStorage.setItem('tr', on ? '1' : '0'); } catch (e) {}
+  if (ready) {
+    map.setLayoutProperty('trafego', 'visibility', on ? 'visible' : 'none');
+    ['inc-lin', 'inc-icon'].forEach(id => map.setLayoutProperty(id, 'visibility', on ? 'visible' : 'none'));
+  }
+  if (on) fetchInc();
+}
+trBtn.addEventListener('click', () => setTrafego(!trOn));
+// de 2 em 2 minutos pede mosaicos novos
+setInterval(() => {
+  if ((trOn || vozOn) && ready && navigator.onLine) { if (trOn) { try { map.getSource('trafego').setTiles([trUrl()]); } catch (e) {} } fetchInc(); }
+}, 120000);
+map.on('error', e => {
+  if (e && e.sourceId === 'trafego' && trOn && Date.now() - trErr > 30000) {
+    trErr = Date.now();
+    info.hidden = false;
+    const n = ++avisaN;
+    info.textContent = navigator.onLine ? 'Trânsito: sem dados aqui' : 'Trânsito: sem rede';
+    setTimeout(() => { if (avisaN === n) info.hidden = true; }, 6000);
+  }
+});
+
+// instalação e cache: a app e o mapa já vistos abrem mesmo com sinal fraco
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+
+// guardar zona: descarrega os mosaicos à volta do centro do ecrã
+const sv = document.getElementById('sv'), pn = document.getElementById('pn'), pt = document.getElementById('pt');
+sv.addEventListener('click', () => { pn.hidden = !pn.hidden; });
+pn.querySelectorAll('button[data-km]').forEach(b => b.addEventListener('click', () => saveZone(+b.dataset.km)));
+
+function tileXY(lon, lat, z) {
+  const n = 2 ** z, r = lat * Math.PI / 180;
+  return [Math.floor((lon + 180) / 360 * n), Math.floor((1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2 * n)];
+}
+
+let saving = false;
+async function saveZone(km) {
+  if (saving) return;
+  const src = map.getSource('openmaptiles');
+  if (!src || !src.tiles || !('caches' in window)) { pt.textContent = 'Não disponível neste browser.'; return; }
+  const tpl = src.tiles[0], maxz = Math.min(14, src.maxzoom || 14);
+  const c = map.getCenter();
+  const dLat = km / 111, dLon = km / (111 * Math.cos(c.lat * Math.PI / 180));
+  const urls = [];
+  for (let z = 5; z <= maxz; z++) {
+    const [x0, y1] = tileXY(c.lng - dLon, c.lat - dLat, z);
+    const [x1, y0] = tileXY(c.lng + dLon, c.lat + dLat, z);
+    for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++)
+      urls.push(tpl.replace('{z}', z).replace('{x}', x).replace('{y}', y));
+  }
+  if (urls.length > 4000) { pt.textContent = 'Zona demasiado grande (' + urls.length + ' mosaicos).'; return; }
+  saving = true;
+  const cache = await caches.open('mapa-dados');
+  let done = 0, fail = 0, i = 0;
+  pt.textContent = 'A guardar 0/' + urls.length;
+  async function worker() {
+    while (i < urls.length) {
+      const u = urls[i++];
+      try {
+        if (!(await cache.match(u))) {
+          const r = await fetch(u);
+          if (r.ok) await cache.put(u, r); else fail++;
+        }
+      } catch (e) { fail++; }
+      done++;
+      if (done % 10 === 0 || done === urls.length) pt.textContent = 'A guardar ' + done + '/' + urls.length;
+    }
+  }
+  await Promise.all(Array.from({ length: 6 }, worker));
+  saving = false;
+  pt.textContent = fail ? 'Guardado, mas ' + fail + ' mosaicos falharam. Repete com boa rede.'
+                        : 'Zona guardada (' + urls.length + ' mosaicos).';
+}
+</script>
+</body>
+</html>
